@@ -15,6 +15,7 @@ export default function Game() {
   const [completedStrokes, setCompletedStrokes] = useState(0);
   const [showPause, setShowPause] = useState(false);
   const [instructionIntro, setInstructionIntro] = useState(false);
+  const [showBoundaryWarning, setShowBoundaryWarning] = useState(false);
 
   const initializeGame = (level: number) => {
     if (gameInstanceRef.current) {
@@ -58,15 +59,21 @@ export default function Game() {
     };
   }, [currentLevel]);
 
-  // Level 1 instruction intro animation
+  // Level instruction intro animation
   useEffect(() => {
     if (currentLevel === 1) {
       setInstructionIntro(true);
       const timer = setTimeout(() => setInstructionIntro(false), 1000);
       return () => clearTimeout(timer);
-    } else {
-      setInstructionIntro(false);
     }
+    if (currentLevel === 2) {
+      // Show boundary warning for level 2 for 3 seconds
+      setShowBoundaryWarning(true);
+      const timer2 = setTimeout(() => setShowBoundaryWarning(false), 3000);
+      return () => clearTimeout(timer2);
+    }
+    setInstructionIntro(false);
+    setShowBoundaryWarning(false);
   }, [currentLevel]);
 
   const resetLevel = () => {
@@ -296,6 +303,42 @@ export default function Game() {
                   <ArrowRight className="w-5 h-5" />
                   Go to Levels
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Boundary Warning Modal for Level 2 */}
+      {showBoundaryWarning && (
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl transform animate-bounce">
+            <div className="text-center">
+              <div className="mb-4">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-3xl">⚠️</span>
+                </div>
+              </div>
+              
+              <h2 className="text-3xl font-bold text-gray-800 mb-2">
+                ⚠️ Level 2 Warning!
+              </h2>
+              
+              <p className="text-lg text-gray-600 mb-2">
+                Circular Course - Stay Within Boundaries!
+              </p>
+              
+              <div className="bg-red-50 rounded-lg p-4 mb-2">
+                <p className="text-md font-semibold text-red-800">
+                  Be careful not to fall off the circular platform!
+                </p>
+                <p className="text-sm text-red-600 mt-1">
+                  The ball will reset if it goes out of bounds.
+                </p>
+              </div>
+              
+              <div className="text-xs text-gray-500">
+                This message will disappear in 3 seconds...
               </div>
             </div>
           </div>

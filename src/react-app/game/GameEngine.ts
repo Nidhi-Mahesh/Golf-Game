@@ -21,28 +21,29 @@ export class GameEngine {
   private aimingLine: THREE.Line | null = null;
   private ballInHole = false;
 
-  // Camera controls
+  // Camera controls - First Person
   private isPanning = false;
   private panStart = new THREE.Vector2();
-  private cameraDistance = 25;
-  private cameraAngleX = Math.PI / 6;
-  private cameraAngleY = Math.PI / 4;
+  private isFirstPerson = true;
+  private firstPersonDistance = 3; // Distance behind the ball
+  private firstPersonHeight = 1.2; // Height above ground
+  private cameraAngleY = 0; // Horizontal rotation
+  private smoothCameraTarget = new THREE.Vector3();
+  private goalDirection = new THREE.Vector3(); // Direction toward the goal
   
-  // Per-level camera presets
-  private getCameraPreset(level: number) {
-    // angleX in radians
-    // Closer distances and slightly steeper angle to make the course appear larger
+  // First-person camera settings per level
+  private getFirstPersonPreset(level: number) {
     switch (level) {
       case 1:
-        return { distance: 12, angleX: Math.PI / 4, fov: 60 };
+        return { distance: 3.5, height: 1.4, fov: 70 };
       case 2:
-        return { distance: 14, angleX: Math.PI / 4.5, fov: 62 };
+        return { distance: 3.8, height: 1.5, fov: 72 };
       case 3:
-        return { distance: 16, angleX: Math.PI / 5, fov: 64 };
+        return { distance: 4.0, height: 1.6, fov: 74 };
       case 4:
-        return { distance: 14, angleX: Math.PI / 4.2, fov: 62 };
+        return { distance: 3.2, height: 1.3, fov: 68 };
       default:
-        return { distance: 14, angleX: Math.PI / 4.5, fov: 60 };
+        return { distance: 3.5, height: 1.4, fov: 70 };
     }
   }
 
@@ -51,6 +52,7 @@ export class GameEngine {
   private wallBodies: CANNON.Body[] = [];
   private holeBody!: CANNON.Body;
   private flag!: THREE.Group;
+  private holePosition = new THREE.Vector3(0, 0, -12); // Default hole position
   private currentLevel = 1;
   private onLevelComplete?: (level: number, strokes: number) => void;
 
@@ -77,14 +79,17 @@ export class GameEngine {
     // Make background transparent so page gradient shows through
     this.scene.background = null as any;
 
-    // Camera
+    // Camera - First Person setup
+    const preset = this.getFirstPersonPreset(this.currentLevel);
     this.camera = new THREE.PerspectiveCamera(
-      60,
+      preset.fov,
       window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    this.updateCameraForLevel();
+    this.firstPersonDistance = preset.distance;
+    this.firstPersonHeight = preset.height;
+    this.updateFirstPersonCamera();
 
     // Renderer
     this.renderer = new THREE.WebGLRenderer({ 
@@ -104,6 +109,13 @@ export class GameEngine {
     this.world.gravity.set(0, -9.82, 0);
     this.world.broadphase = new CANNON.SAPBroadphase(this.world);
     
+    // Improve physics stability
+    this.world.allowSleep = true;
+    this.world.defaultContactMaterial.friction = 0.8;
+    this.world.defaultContactMaterial.restitution = 0.2;
+    this.world.solver.iterations = 10; // More solver iterations for stability
+    this.world.solver.tolerance = 0.1;
+    
     // Contact material for ball physics
     const ballMaterial = new CANNON.Material('ball');
     const groundMaterial = new CANNON.Material('ground');
@@ -115,8 +127,10 @@ export class GameEngine {
       {
         friction: 0.8,
         restitution: 0.2,
-        frictionEquationStiffness: 1e8,
-        frictionEquationRelaxation: 3
+        frictionEquationStiffness: 1e7, // Reduced for stability
+        frictionEquationRelaxation: 4,
+        contactEquationStiffness: 1e8,
+        contactEquationRelaxation: 3
       }
     );
     
@@ -171,8 +185,10 @@ export class GameEngine {
     } else if (this.currentLevel === 4) {
       this.setupLevel4();
     }
-    // Apply camera after level geometry to ensure target is valid
-    this.updateCameraForLevel();
+    // Calculate goal direction for first-person camera
+    this.calculateGoalDirection();
+    // Apply first-person camera after level geometry
+    this.updateFirstPersonCamera();
   }
 
   private setupLevel1() {
@@ -186,6 +202,7 @@ export class GameEngine {
     // Ground physics
     const groundShape = new CANNON.Box(new CANNON.Vec3(10, 0.25, 15));
     const groundBody = new CANNON.Body({ mass: 0 });
+    groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
     groundBody.position.set(0, -0.25, 0);
     this.world.addBody(groundBody);
@@ -216,6 +233,7 @@ export class GameEngine {
     // Ground physics - circular
     const groundShape = new CANNON.Cylinder(radius, radius, 0.5, 16);
     const groundBody = new CANNON.Body({ mass: 0 });
+    groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
     groundBody.position.set(0, -0.25, 0);
     this.world.addBody(groundBody);
@@ -223,13 +241,10 @@ export class GameEngine {
     // Circular boundary wall
     this.createCircularWall(0, 1, 0, radius + 1, 2, 0xD2B48C);
 
-    // Level 2 obstacles - more challenging
-    this.createWall(-7, 0.75, 8, 3, 1.5, 3, 0xE9806E); // Left obstacle
-    this.createWall(7, 0.75, 8, 3, 1.5, 3, 0xDD6031); // Right obstacle
-    this.createWall(0, 0.75, 5, 4, 1.5, 2, 0xA2C7E5); // Center top
-    this.createWall(-3, 0.75, -2, 2, 1.5, 6, 0xF5B82E); // Left middle
-    this.createWall(3, 0.75, -2, 2, 1.5, 6, 0xE9806E); // Right middle
-    this.createWall(0, 0.75, -8, 8, 1.5, 2, 0xDD6031); // Center bottom
+    // Level 2 obstacles - reduced for easier navigation
+    this.createWall(0, 0.75, 3, 3, 1.5, 2, 0xA2C7E5); // Center obstacle
+    this.createWall(-5, 0.75, -5, 2, 1.5, 3, 0xF5B82E); // Left obstacle
+    this.createWall(5, 0.75, -5, 2, 1.5, 3, 0xE9806E); // Right obstacle
 
     this.createHole(0, -15);
   }
@@ -243,9 +258,13 @@ export class GameEngine {
       const wallX = x + Math.cos(angle) * radius;
       const wallZ = z + Math.sin(angle) * radius;
       
-      // Visual wall segment - larger for better visibility
+      // Visual wall segment - larger for better visibility, semi-transparent
       const wallGeometry = new THREE.BoxGeometry(wallThickness * 1.5, height, wallThickness * 1.5);
-      const wallMaterial = new THREE.MeshLambertMaterial({ color: color });
+      const wallMaterial = new THREE.MeshLambertMaterial({ 
+        color: color,
+        transparent: true,
+        opacity: 0.7 // 70% opacity, 30% transparent
+      });
       const wall = new THREE.Mesh(wallGeometry, wallMaterial);
       wall.position.set(wallX, y, wallZ);
       wall.rotation.y = angle;
@@ -278,6 +297,7 @@ export class GameEngine {
     // Ground physics
     const groundShape = new CANNON.Box(new CANNON.Vec3(15, 0.25, 20));
     const groundBody = new CANNON.Body({ mass: 0 });
+    groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
     groundBody.position.set(0, -0.25, 0);
     this.world.addBody(groundBody);
@@ -344,6 +364,7 @@ export class GameEngine {
       // Floor physics
       const floorShape = new CANNON.Box(new CANNON.Vec3(trackWidth / 2, 0.2, segLen / 2));
       const floorBody = new CANNON.Body({ mass: 0 });
+      floorBody.material = new CANNON.Material('ground');
       floorBody.addShape(floorShape);
       floorBody.position.set(segmentCenter.x, 0, segmentCenter.z);
       floorBody.quaternion.setFromEuler(slope, yaw, 0, 'XYZ');
@@ -356,7 +377,11 @@ export class GameEngine {
 
       const placeWall = (offset: THREE.Vector3) => {
         const wallGeom = new THREE.BoxGeometry(wallThickness, wallHeight, segLen);
-        const wallMat = new THREE.MeshLambertMaterial({ color: 0xD2B48C });
+        const wallMat = new THREE.MeshLambertMaterial({ 
+          color: 0xD2B48C,
+          transparent: true,
+          opacity: 0.7 // 70% opacity, 30% transparent
+        });
         const wall = new THREE.Mesh(wallGeom, wallMat);
         wall.position.copy(segmentCenter.clone().add(offset));
         wall.rotation.y = yaw;
@@ -425,6 +450,7 @@ export class GameEngine {
     // Starter lip (physics)
     const lipShape = new CANNON.Box(new CANNON.Vec3(trackWidth / 2, lipHeight / 2, lipDepth / 2));
     const lipBody = new CANNON.Body({ mass: 0 });
+    lipBody.material = new CANNON.Material('ground');
     lipBody.addShape(lipShape);
     lipBody.position.set(lip.position.x, lip.position.y, lip.position.z);
     lipBody.quaternion.setFromEuler(startSlope, startYaw, 0, 'XYZ');
@@ -445,6 +471,7 @@ export class GameEngine {
 
     const backLipShape = new CANNON.Box(new CANNON.Vec3((trackWidth * 0.5) / 2, backLipHeight / 2, backLipDepth / 2));
     const backLipBody = new CANNON.Body({ mass: 0 });
+    backLipBody.material = new CANNON.Material('ground');
     backLipBody.addShape(backLipShape);
     backLipBody.position.set(backLip.position.x, backLip.position.y, backLip.position.z);
     backLipBody.quaternion.setFromEuler(0, startYaw, 0, 'XYZ');
@@ -465,6 +492,7 @@ export class GameEngine {
       this.scene.add(nub);
       const nubShape = new CANNON.Box(new CANNON.Vec3(nubWidth/2, nubHeight/2, nubDepth/2));
       const nubBody = new CANNON.Body({ mass: 0 });
+      nubBody.material = new CANNON.Material('ground');
       nubBody.addShape(nubShape);
       nubBody.position.set(nub.position.x, nub.position.y, nub.position.z);
       nubBody.quaternion.setFromEuler(0, startYaw, 0, 'XYZ');
@@ -573,9 +601,21 @@ export class GameEngine {
     }
   }
 
-  
+  private calculateGoalDirection() {
+    // Calculate direction from ball start position to hole
+    this.goalDirection.copy(this.holePosition).sub(this.ballStartPos);
+    this.goalDirection.y = 0; // Keep it horizontal
+    this.goalDirection.normalize();
+    
+    // Set initial camera angle to face the goal
+    this.cameraAngleY = Math.atan2(this.goalDirection.x, this.goalDirection.z);
+    console.log(`Goal direction calculated for level ${this.currentLevel}:`, this.goalDirection);
+  }
 
   private createHole(x: number, z: number) {
+    // Store hole position for camera calculations
+    this.holePosition.set(x, 0, z);
+    
     // Create hole depression in ground (smaller hole)
     const holeDepthGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.5, 16);
     const holeDepthMaterial = new THREE.MeshLambertMaterial({ color: 0x0a0a0a });
@@ -641,9 +681,13 @@ export class GameEngine {
   }
 
   private createWall(x: number, y: number, z: number, width: number, height: number, depth: number, color: number = 0xF4A460) {
-    // Visual wall
+    // Visual wall - semi-transparent for better ball visibility
     const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-    const wallMaterial = new THREE.MeshLambertMaterial({ color: color });
+    const wallMaterial = new THREE.MeshLambertMaterial({ 
+      color: color,
+      transparent: true,
+      opacity: 0.7 // 70% opacity, 30% transparent
+    });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.position.set(x, y, z);
     wall.castShadow = true;
@@ -665,7 +709,11 @@ export class GameEngine {
   // Oriented wall helper matching yaw (Y) and pitch (X)
   private createRotatedWall(x: number, y: number, z: number, width: number, height: number, depth: number, yaw: number, pitch: number, color: number = 0xD2B48C) {
     const wallGeometry = new THREE.BoxGeometry(width, height, depth);
-    const wallMaterial = new THREE.MeshLambertMaterial({ color });
+    const wallMaterial = new THREE.MeshLambertMaterial({ 
+      color,
+      transparent: true,
+      opacity: 0.7 // 70% opacity, 30% transparent
+    });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.position.set(x, y, z);
     wall.rotation.set(pitch, yaw, 0, 'XYZ');
@@ -752,12 +800,11 @@ export class GameEngine {
       this.updateAimingUI();
     } else if (this.isPanning && event.buttons === 2) {
       const deltaX = event.clientX - this.panStart.x;
-      const deltaY = event.clientY - this.panStart.y;
       
+      // Only allow horizontal rotation in first-person
       this.cameraAngleY -= deltaX * 0.01;
-      this.cameraAngleX = Math.max(0.1, Math.min(Math.PI / 2, this.cameraAngleX - deltaY * 0.01));
       
-      this.updateCameraPosition();
+      this.updateFirstPersonCamera();
       
       this.panStart.set(event.clientX, event.clientY);
     }
@@ -775,9 +822,9 @@ export class GameEngine {
 
   private onMouseWheel(event: WheelEvent) {
     event.preventDefault();
-    // Allow closer zoom and slightly lower max to keep things readable
-    this.cameraDistance = Math.max(6, Math.min(40, this.cameraDistance + event.deltaY * 0.01));
-    this.updateCameraPosition();
+    // Adjust first-person distance for zooming in/out
+    this.firstPersonDistance = Math.max(1.5, Math.min(8, this.firstPersonDistance + event.deltaY * 0.005));
+    this.updateFirstPersonCamera();
   }
 
   private updateAimingUI() {
@@ -1005,16 +1052,39 @@ export class GameEngine {
     
     const deltaTime = this.clock.getDelta();
     
-    // Update physics
-    this.world.step(deltaTime);
+    // Clamp deltaTime to prevent physics instability
+    const clampedDeltaTime = Math.min(deltaTime, 1/30); // Max 30fps minimum
+    
+    // Update physics with fixed timestep for stability
+    this.world.step(clampedDeltaTime);
+    
+    // Validate ball physics body
+    if (!this.ballBody || isNaN(this.ballBody.position.x) || isNaN(this.ballBody.position.y) || isNaN(this.ballBody.position.z)) {
+      console.log('Ball physics body corrupted! Resetting...');
+      this.resetBall();
+      return;
+    }
     
     // Update ball visual position
     this.ball.position.copy(this.ballBody.position as any);
     this.ball.quaternion.copy(this.ballBody.quaternion as any);
     
-    // Check for ball out of bounds and reset if needed
+    // Safety check for physics instability - reset if ball falls too far below ground
     const ballPosition = this.ballBody.position;
     const currentLevel = this.currentLevel;
+    
+    if (ballPosition.y < -10 && !this.ballInHole) {
+      console.log(`Ball fell through floor! Position: x=${ballPosition.x.toFixed(2)}, y=${ballPosition.y.toFixed(2)}, z=${ballPosition.z.toFixed(2)}, Level: ${currentLevel}`);
+      this.resetBall();
+      return;
+    }
+    
+    // Additional monitoring for suspicious Y positions in Level 3
+    if (currentLevel === 3 && ballPosition.y < -2 && !this.ballInHole) {
+      console.log(`Warning: Ball Y position is ${ballPosition.y.toFixed(2)} in Level 3`);
+    }
+    
+    // Check for ball out of bounds and reset if needed
     let outOfBounds = false;
     
     if (currentLevel === 1) {
@@ -1109,10 +1179,8 @@ export class GameEngine {
       }
     }
     
-    // Update camera to follow ball
-    const ballPos = this.ball.position;
-    this.cameraTarget.lerp(ballPos, 0.02);
-    this.updateCameraPosition();
+    // Update first-person camera to follow ball
+    this.updateFirstPersonCamera();
     
     this.renderer.render(this.scene, this.camera);
   }
@@ -1129,28 +1197,43 @@ export class GameEngine {
     }
   }
 
-  private updateCameraPosition() {
-    const x = this.cameraDistance * Math.sin(this.cameraAngleX) * Math.cos(this.cameraAngleY);
-    const y = this.cameraDistance * Math.cos(this.cameraAngleX);
-    const z = this.cameraDistance * Math.sin(this.cameraAngleX) * Math.sin(this.cameraAngleY);
+  private updateFirstPersonCamera() {
+    // Get ball position
+    const ballPos = this.ball ? this.ball.position : this.ballStartPos;
     
-    this.camera.position.set(
-      this.cameraTarget.x + x,
-      this.cameraTarget.y + y,
-      this.cameraTarget.z + z
+    // Calculate camera position behind the ball
+    const cameraOffset = new THREE.Vector3(
+      -Math.sin(this.cameraAngleY) * this.firstPersonDistance,
+      this.firstPersonHeight,
+      -Math.cos(this.cameraAngleY) * this.firstPersonDistance
     );
-    this.camera.lookAt(this.cameraTarget);
+    
+    const cameraPos = ballPos.clone().add(cameraOffset);
+    
+    // Smooth camera movement
+    this.smoothCameraTarget.lerp(ballPos, 0.05);
+    
+    // Position camera
+    this.camera.position.copy(cameraPos);
+    
+    // Look slightly ahead of the ball toward the goal direction
+    const lookAtTarget = ballPos.clone().add(
+      this.goalDirection.clone().multiplyScalar(2)
+    );
+    lookAtTarget.y = ballPos.y + 0.2; // Look slightly up to see the ball and hole
+    
+    this.camera.lookAt(lookAtTarget);
   }
 
   private updateCameraForLevel() {
-    const preset = this.getCameraPreset(this.currentLevel);
-    this.cameraDistance = preset.distance;
-    this.cameraAngleX = preset.angleX;
+    const preset = this.getFirstPersonPreset(this.currentLevel);
+    this.firstPersonDistance = preset.distance;
+    this.firstPersonHeight = preset.height;
     if (this.camera) {
       this.camera.fov = preset.fov;
       this.camera.updateProjectionMatrix();
     }
-    this.updateCameraPosition();
+    this.updateFirstPersonCamera();
   }
 
   public dispose() {
