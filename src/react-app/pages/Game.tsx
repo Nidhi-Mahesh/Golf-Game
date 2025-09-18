@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pause, Volume2, Trophy, ArrowRight, RotateCcw as Replay } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
+import { LeaderboardService } from '../services/leaderboard';
 
 export default function Game() {
   const navigate = useNavigate();
@@ -29,6 +30,11 @@ export default function Game() {
         gameInstanceRef.current = new GameEngine(canvas, level, (_, strokes) => {
           setCompletedStrokes(strokes);
           setShowCongrats(true);
+          
+          // Get player name and add to leaderboard
+          const playerName = localStorage.getItem('playerName') || 'Anonymous';
+          LeaderboardService.addScore(playerName, level, strokes);
+          
           // Persist progress immediately when a level is completed
           const saved = localStorage.getItem('levelsData');
           let levelsData = saved ? JSON.parse(saved) : [];

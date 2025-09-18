@@ -1,7 +1,11 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom"; 
+// ^--- must be react-router-dom, not react-router
+
 import StartScreen from "@/react-app/pages/StartScreen";
 import Game from "@/react-app/pages/Game";
 import LevelSelectScreen from "@/react-app/pages/LevelSelectScreen";
+
+
 
 export default function App() {
   return (

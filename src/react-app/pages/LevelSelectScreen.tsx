@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { Lock } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom"; // fixed import
+import { Lock, Home as HomeIcon } from "lucide-react";
 
 const MAX_LEVELS = 4; // Game now has 4 levels
 
@@ -13,11 +13,11 @@ interface LevelData {
 export default function LevelSelectScreen() {
   const navigate = useNavigate();
   const [levels, setLevels] = useState<LevelData[]>([]);
-  const [lastLevelsJson, setLastLevelsJson] = useState<string>('');
+  const [lastLevelsJson, setLastLevelsJson] = useState<string>("");
 
   // Load from localStorage, creating defaults if missing
   const loadLevels = () => {
-    const savedLevels = localStorage.getItem('levelsData');
+    const savedLevels = localStorage.getItem("levelsData");
     if (savedLevels) {
       const parsedLevels = JSON.parse(savedLevels);
       // Filter to only include levels 1-4, removing any level 5 data
@@ -31,65 +31,92 @@ export default function LevelSelectScreen() {
         localStorage.setItem('levelsData', newJson);
       }
     } else {
-      const initialLevels: LevelData[] = Array.from({ length: MAX_LEVELS }, (_, i) => ({
-        id: i + 1,
-        bestScore: null,
-        isUnlocked: i === 0,
-      }));
+      const initialLevels: LevelData[] = Array.from(
+        { length: MAX_LEVELS },
+        (_, i) => ({
+          id: i + 1,
+          bestScore: null,
+          isUnlocked: i === 0,
+        })
+      );
       const json = JSON.stringify(initialLevels);
       setLevels(initialLevels);
       setLastLevelsJson(json);
-      localStorage.setItem('levelsData', json);
+      localStorage.setItem("levelsData", json);
     }
   };
 
   useEffect(() => {
     loadLevels();
-    // Refresh periodically while on this screen so it "keeps updating"
     const interval = setInterval(loadLevels, 1000);
-    // Update on tab focus or external changes
+
     const onFocus = () => loadLevels();
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'levelsData') loadLevels();
+      if (e.key === "levelsData") loadLevels();
     };
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('storage', onStorage);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("storage", onStorage);
+
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('storage', onStorage);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
   const handleLevelClick = (levelId: number) => {
-    const selectedLevel = levels.find(level => level.id === levelId);
+    const selectedLevel = levels.find((level) => level.id === levelId);
     if (selectedLevel?.isUnlocked) {
       navigate(`/game?level=${levelId}`);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex flex-col items-center justify-center p-4">
-      <h1 className="text-5xl font-bold text-white mb-12 tracking-tight">LEVEL SELECT</h1>
+    <div className="relative min-h-screen bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 flex flex-col items-center justify-center p-4">
+      {/* Home button */}
+      <div className="absolute top-4 left-4">
+        <Link
+          to="/"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-md"
+        >
+          <HomeIcon className="w-5 h-5" />
+          Home
+        </Link>
+      </div>
+
+      <h1 className="text-5xl font-bold text-white mb-12 tracking-tight">
+        LEVEL SELECT
+      </h1>
+
       <div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
         {levels.map((level) => (
           <button
             key={level.id}
             onClick={() => handleLevelClick(level.id)}
             className={`relative flex flex-col items-center justify-center p-4 rounded-lg shadow-lg text-white font-bold text-2xl
-              ${level.isUnlocked ? 'bg-blue-500 hover:bg-blue-600 cursor-pointer' : 'bg-gray-700 cursor-not-allowed opacity-70'}
+              ${
+                level.isUnlocked
+                  ? "bg-blue-500 hover:bg-blue-600 cursor-pointer"
+                  : "bg-gray-700 cursor-not-allowed opacity-70"
+              }
             `}
             disabled={!level.isUnlocked}
           >
             {level.isUnlocked ? (
               <>
                 {level.id}
-                <span className="text-sm font-normal mt-1">Best {level.bestScore !== null ? level.bestScore : '-'}</span>
+                <span className="text-sm font-normal mt-1">
+                  Best {level.bestScore !== null ? level.bestScore : "-"}
+                </span>
               </>
             ) : (
               <Lock className="w-8 h-8 text-gray-400" />
             )}
-            {!level.isUnlocked && <span className="absolute inset-0 flex items-center justify-center text-sm font-normal text-gray-400">Best -</span>}
+            {!level.isUnlocked && (
+              <span className="absolute inset-0 flex items-center justify-center text-sm font-normal text-gray-400">
+                Best -
+              </span>
+            )}
           </button>
         ))}
       </div>
