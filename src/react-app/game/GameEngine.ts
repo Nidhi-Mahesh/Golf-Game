@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { CatmullRomCurve3 } from 'three';
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -14,7 +15,7 @@ export class GameEngine {
   private aimStart = new THREE.Vector2();
   private aimCurrent = new THREE.Vector2();
   private strokes = 0;
-  private ballStartPos = new THREE.Vector3(0, 1, 8);
+  private ballStartPos = new THREE.Vector3(0, 0.5, 8); // Lower start position
   private cameraTarget = new THREE.Vector3(0, 0, 0);
   private clock = new THREE.Clock();
   private isMuted = false;
@@ -120,6 +121,7 @@ export class GameEngine {
     const ballMaterial = new CANNON.Material('ball');
     const groundMaterial = new CANNON.Material('ground');
     const wallMaterial = new CANNON.Material('wall');
+    const bouncyWallMaterial = new CANNON.Material('bouncyWall'); // Super bouncy walls for Level 4
     
     const ballGroundContact = new CANNON.ContactMaterial(
       ballMaterial,
@@ -145,8 +147,23 @@ export class GameEngine {
       }
     );
     
+    // Super bouncy walls for Level 4 - even more bouncy!
+    const ballBouncyWallContact = new CANNON.ContactMaterial(
+      ballMaterial,
+      bouncyWallMaterial,
+      {
+        friction: 0.1, // Low friction for more sliding
+        restitution: 1.2, // Super bouncy - more than 100% energy return!
+        frictionEquationStiffness: 1e10,
+        frictionEquationRelaxation: 3,
+        contactEquationStiffness: 1e10,
+        contactEquationRelaxation: 3
+      }
+    );
+    
     this.world.addContactMaterial(ballGroundContact);
     this.world.addContactMaterial(ballWallContact);
+    this.world.addContactMaterial(ballBouncyWallContact);
   }
 
   private setupLighting() {
@@ -176,14 +193,23 @@ export class GameEngine {
   }
 
   private setupCourse() {
-    if (this.currentLevel === 1) {
-      this.setupLevel1();
-    } else if (this.currentLevel === 2) {
-      this.setupLevel2();
-    } else if (this.currentLevel === 3) {
-      this.setupLevel3();
-    } else if (this.currentLevel === 4) {
-      this.setupLevel4();
+    // Set ball start positions for each level - properly positioned on ground surface
+    switch (this.currentLevel) {
+      case 1:
+        this.ballStartPos = new THREE.Vector3(0, 0.3, 8); // Ball radius above ground surface
+        this.setupLevel1();
+        break;
+      case 2:
+        this.ballStartPos = new THREE.Vector3(0, 0.3, 15); // Ball radius above ground surface
+        this.setupLevel2();
+        break;
+      case 3:
+        this.ballStartPos = new THREE.Vector3(0, 0.3, 12); // Ball radius above ground surface
+        this.setupLevel3();
+        break;
+      case 4:
+        this.setupLevel4(); // Level 4 sets its own ball position
+        break;
     }
     // Calculate goal direction for first-person camera
     this.calculateGoalDirection();
@@ -192,19 +218,19 @@ export class GameEngine {
   }
 
   private setupLevel1() {
-    // Ground
-    const groundGeometry = new THREE.BoxGeometry(20, 0.5, 30);
+    // Ground - thinner so ball sits on top
+    const groundGeometry = new THREE.BoxGeometry(20, 0.1, 30);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
 
-    // Ground physics
-    const groundShape = new CANNON.Box(new CANNON.Vec3(10, 0.25, 15));
+    // Ground physics - much thinner
+    const groundShape = new CANNON.Box(new CANNON.Vec3(10, 0.05, 15));
     const groundBody = new CANNON.Body({ mass: 0 });
     groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
-    groundBody.position.set(0, -0.25, 0);
+    groundBody.position.set(0, -0.05, 0); // Just below surface
     this.world.addBody(groundBody);
 
     // Course boundaries - moderate height walls
@@ -222,20 +248,20 @@ export class GameEngine {
   }
 
   private setupLevel2() {
-    // Circular ground
+    // Circular ground - thinner
     const radius = 18;
-    const groundGeometry = new THREE.CylinderGeometry(radius, radius, 0.5, 32);
+    const groundGeometry = new THREE.CylinderGeometry(radius, radius, 0.1, 32);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
 
-    // Ground physics - circular
-    const groundShape = new CANNON.Cylinder(radius, radius, 0.5, 16);
+    // Ground physics - circular, much thinner
+    const groundShape = new CANNON.Cylinder(radius, radius, 0.1, 16);
     const groundBody = new CANNON.Body({ mass: 0 });
     groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
-    groundBody.position.set(0, -0.25, 0);
+    groundBody.position.set(0, -0.05, 0); // Just below surface
     this.world.addBody(groundBody);
 
     // Circular boundary wall
@@ -287,19 +313,19 @@ export class GameEngine {
   }
 
   private setupLevel3() {
-    // Larger ground for level 3
-    const groundGeometry = new THREE.BoxGeometry(30, 0.5, 40);
+    // Larger ground for level 3 - thinner
+    const groundGeometry = new THREE.BoxGeometry(30, 0.1, 40);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
 
-    // Ground physics
-    const groundShape = new CANNON.Box(new CANNON.Vec3(15, 0.25, 20));
+    // Ground physics - much thinner
+    const groundShape = new CANNON.Box(new CANNON.Vec3(15, 0.05, 20));
     const groundBody = new CANNON.Body({ mass: 0 });
     groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
-    groundBody.position.set(0, -0.25, 0);
+    groundBody.position.set(0, -0.05, 0); // Just below surface
     this.world.addBody(groundBody);
 
     // Course boundaries
@@ -308,15 +334,15 @@ export class GameEngine {
     this.createWall(15.5, 1, 0, 1, 2, 41, 0xD2B48C); // Right wall
     this.createWall(-15.5, 1, 0, 1, 2, 41, 0xD2B48C); // Left wall
 
-    // Create natural terrain bumps and ridges
-    this.createTerrainBumps();
+    // Create random bumps on the ground
+    this.createRandomBumps();
 
     this.createHole(0, -18);
   }
 
   private setupLevel4() {
     // Curved slide course: a curving track with continuous side walls
-    const segments = 36;
+    const segments = 72; // More segments for smoother curve
     const trackWidth = 7; // playable width
     const wallHeight = 3.5;
     const wallThickness = 0.8;
@@ -334,6 +360,7 @@ export class GameEngine {
     const up = new THREE.Vector3(0, 1, 0);
     let endPoint = centerAt(1);
 
+    // Create smooth surface using more segments but keep it simple
     for (let i = 0; i < segments; i++) {
       const t0 = i / segments;
       const t1 = (i + 1) / segments;
@@ -351,8 +378,8 @@ export class GameEngine {
       const baseSlope = -Math.PI / 40; // ~4.5 degrees
       const slope = i < 6 ? 0 : baseSlope;
 
-      // Floor piece (visual)
-      const floorGeom = new THREE.BoxGeometry(trackWidth, 0.4, segLen);
+      // Floor piece (visual) - make it thinner for smoother appearance
+      const floorGeom = new THREE.BoxGeometry(trackWidth, 0.2, segLen * 0.9); // Slightly smaller segments to reduce gaps
       const floorMat = new THREE.MeshLambertMaterial({ color: 0x6fbf73 });
       const floor = new THREE.Mesh(floorGeom, floorMat);
       floor.position.set(segmentCenter.x, 0, segmentCenter.z);
@@ -361,8 +388,8 @@ export class GameEngine {
       floor.receiveShadow = true;
       this.scene.add(floor);
 
-      // Floor physics
-      const floorShape = new CANNON.Box(new CANNON.Vec3(trackWidth / 2, 0.2, segLen / 2));
+      // Floor physics - thinner for better ball contact
+      const floorShape = new CANNON.Box(new CANNON.Vec3(trackWidth / 2, 0.05, segLen / 2));
       const floorBody = new CANNON.Body({ mass: 0 });
       floorBody.material = new CANNON.Material('ground');
       floorBody.addShape(floorShape);
@@ -393,7 +420,7 @@ export class GameEngine {
 
         const wallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, wallHeight / 2, segLen / 2));
         const wallBody = new CANNON.Body({ mass: 0 });
-        wallBody.material = new CANNON.Material('wall');
+        wallBody.material = new CANNON.Material('bouncyWall'); // Use super bouncy material for Level 4
         wallBody.addShape(wallShape);
         wallBody.position.set(wall.position.x, wall.position.y + wallHeight / 2 - 0.2, wall.position.z);
         wallBody.quaternion.setFromEuler(slope, yaw, 0, 'XYZ');
@@ -431,7 +458,7 @@ export class GameEngine {
 
     // Place ball just before a small aligned starter lip
     const backOffset = startDir.clone().multiplyScalar(0.3);
-    this.ballStartPos = new THREE.Vector3(startPoint.x - backOffset.x, 1.2, startPoint.z - backOffset.z);
+    this.ballStartPos = new THREE.Vector3(startPoint.x - backOffset.x, 0.3, startPoint.z - backOffset.z);
 
     // Starter lip removed to prevent blocking ball movement
 
@@ -482,103 +509,80 @@ export class GameEngine {
     placeNub(-1);
   }
 
-  private createTerrainBumps() {
-    // Create small rolling hills and ridges scattered across the course
+  private createRandomBumps() {
+    // Create rectangular bumps that span the full width of the course, arranged sequentially
+    const bumpColor = 0x8B4513; // Brown color for better visibility
+    const courseWidth = 28; // Full width of the course
+    const bumpHeight = 0.35; // Lower height - easier to cross but still visible
+    const bumpDepth = 2.0; // Longer depth for proper ramp sections
     
-    // Ridge 1 - diagonal ridge across the middle (much lower)
-    this.createRidge(-8, 0.15, 2, 12, 0.25, 1.8, Math.PI/6, 0xE9806E);
+    // Create 6 rectangular bumps arranged one after another
+    const positions = [8, 4, 0, -4, -8, -12]; // Z positions moving toward the hole
     
-    // Ridge 2 - perpendicular ridge (much lower)
-    this.createRidge(6, 0.12, 6, 8, 0.2, 1.5, -Math.PI/8, 0xA2C7E5);
-    
-    // Small bumps scattered around (much lower and wider)
-    this.createBump(-5, 0.15, 10, 3.0, 0.25, 0xF5B82E);
-    this.createBump(4, 0.12, 0, 2.5, 0.2, 0xDD6031);
-    this.createBump(-2, 0.13, -5, 2.8, 0.22, 0xE9806E);
-    this.createBump(8, 0.16, -8, 3.2, 0.28, 0xA2C7E5);
-    this.createBump(-7, 0.1, -12, 2.0, 0.18, 0xF5B82E);
-    
-    // Gentle rolling mounds (much lower)
-    this.createMound(-10, 0.2, -2, 4.5, 0.35, 0xDD6031);
-    this.createMound(10, 0.18, 3, 4.0, 0.32, 0xE9806E);
-    this.createMound(0, 0.15, -10, 3.5, 0.28, 0xA2C7E5);
-  }
-
-  private createRidge(x: number, y: number, z: number, length: number, height: number, width: number, angle: number, color: number) {
-    // Visual ridge using elongated ellipsoid
-    const ridgeGeometry = new THREE.CylinderGeometry(width/2, width/2, height, 8, 1);
-    ridgeGeometry.scale(length/width, 1, 1); // Stretch to create ridge shape
-    const ridgeMaterial = new THREE.MeshLambertMaterial({ color: color });
-    const ridge = new THREE.Mesh(ridgeGeometry, ridgeMaterial);
-    ridge.position.set(x, y, z);
-    ridge.rotation.y = angle; // Rotate around Y-axis for direction
-    ridge.castShadow = true;
-    ridge.receiveShadow = true;
-    this.scene.add(ridge);
-
-    // Physics approximation using multiple small cylinders
-    const segments = Math.floor(length / 1.5);
-    for (let i = 0; i < segments; i++) {
-      const segmentX = x + (i - segments/2) * (length / segments) * Math.cos(angle);
-      const segmentZ = z + (i - segments/2) * (length / segments) * Math.sin(angle);
-      
-      const ridgeShape = new CANNON.Cylinder(width/2, width/2, height, 6);
-      const ridgeBody = new CANNON.Body({ mass: 0 });
-      ridgeBody.material = new CANNON.Material('ground');
-      ridgeBody.addShape(ridgeShape);
-      ridgeBody.position.set(segmentX, y, segmentZ);
-      this.world.addBody(ridgeBody);
+    for (let i = 0; i < positions.length; i++) {
+      this.createRectangularBump(0, bumpHeight/2, positions[i], courseWidth, bumpHeight, bumpDepth, bumpColor);
     }
   }
 
-  private createBump(x: number, y: number, z: number, radius: number, height: number, color: number) {
-    // Visual bump using flattened sphere
-    const bumpGeometry = new THREE.SphereGeometry(radius, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-    bumpGeometry.scale(1, height/radius, 1); // Flatten the sphere
-    const bumpMaterial = new THREE.MeshLambertMaterial({ color: color });
-    const bump = new THREE.Mesh(bumpGeometry, bumpMaterial);
-    bump.position.set(x, y, z);
-    bump.castShadow = true;
-    bump.receiveShadow = true;
-    this.scene.add(bump);
+  private createRectangularBump(x: number, y: number, z: number, width: number, height: number, depth: number, color: number) {
+    // Create a proper ramp with 3 sections: up slope, flat top, down slope
+    const slopeAngle = Math.PI / 12; // 15 degrees - gentle slope
+    const sectionDepth = depth / 3;
+    
+    // Up slope - lower to ground
+    const upSlopeGeom = new THREE.BoxGeometry(width, height, sectionDepth);
+    const upSlope = new THREE.Mesh(upSlopeGeom, new THREE.MeshLambertMaterial({ color: color }));
+    upSlope.position.set(x, height/4, z - sectionDepth); // Lower
+    upSlope.rotation.x = -slopeAngle;
+    upSlope.castShadow = true;
+    upSlope.receiveShadow = true;
+    this.scene.add(upSlope);
+    
+    // Flat top - lower peak
+    const topGeom = new THREE.BoxGeometry(width, height/2, sectionDepth);
+    const top = new THREE.Mesh(topGeom, new THREE.MeshLambertMaterial({ color: color }));
+    top.position.set(x, height/3, z); // Lower peak
+    top.castShadow = true;
+    top.receiveShadow = true;
+    this.scene.add(top);
+    
+    // Down slope - lower to ground
+    const downSlopeGeom = new THREE.BoxGeometry(width, height, sectionDepth);
+    const downSlope = new THREE.Mesh(downSlopeGeom, new THREE.MeshLambertMaterial({ color: color }));
+    downSlope.position.set(x, height/4, z + sectionDepth); // Lower
+    downSlope.rotation.x = slopeAngle;
+    downSlope.castShadow = true;
+    downSlope.receiveShadow = true;
+    this.scene.add(downSlope);
 
-    // Physics approximation using cylinder
-    const bumpShape = new CANNON.Cylinder(radius * 0.8, radius * 0.8, height, 8);
-    const bumpBody = new CANNON.Body({ mass: 0 });
-    bumpBody.material = new CANNON.Material('ground');
-    bumpBody.addShape(bumpShape);
-    bumpBody.position.set(x, y, z);
-    this.world.addBody(bumpBody);
+    // Physics bodies for each section
+    // Up slope physics - lower
+    const upSlopeShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, sectionDepth/2));
+    const upSlopeBody = new CANNON.Body({ mass: 0 });
+    upSlopeBody.material = new CANNON.Material('ground');
+    upSlopeBody.addShape(upSlopeShape);
+    upSlopeBody.position.set(x, height/4, z - sectionDepth); // Lower
+    upSlopeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -slopeAngle);
+    this.world.addBody(upSlopeBody);
+    
+    // Top physics - lower
+    const topShape = new CANNON.Box(new CANNON.Vec3(width/2, height/4, sectionDepth/2));
+    const topBody = new CANNON.Body({ mass: 0 });
+    topBody.material = new CANNON.Material('ground');
+    topBody.addShape(topShape);
+    topBody.position.set(x, height/3, z); // Lower peak
+    this.world.addBody(topBody);
+    
+    // Down slope physics - lower
+    const downSlopeShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, sectionDepth/2));
+    const downSlopeBody = new CANNON.Body({ mass: 0 });
+    downSlopeBody.material = new CANNON.Material('ground');
+    downSlopeBody.addShape(downSlopeShape);
+    downSlopeBody.position.set(x, height/4, z + sectionDepth); // Lower
+    downSlopeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), slopeAngle);
+    this.world.addBody(downSlopeBody);
   }
 
-  private createMound(x: number, y: number, z: number, radius: number, height: number, color: number) {
-    // Visual mound using hemisphere
-    const moundGeometry = new THREE.SphereGeometry(radius, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-    moundGeometry.scale(1, height/radius, 1);
-    const moundMaterial = new THREE.MeshLambertMaterial({ color: color });
-    const mound = new THREE.Mesh(moundGeometry, moundMaterial);
-    mound.position.set(x, y, z);
-    mound.castShadow = true;
-    mound.receiveShadow = true;
-    this.scene.add(mound);
-
-    // Physics approximation using multiple overlapping cylinders for smooth rolling
-    const rings = 4;
-    for (let i = 0; i < rings; i++) {
-      const ringRadius = radius * (1 - i / rings);
-      const ringHeight = height * (1 - i / rings) / rings;
-      const ringY = y + (i * height / rings);
-      
-      if (ringRadius > 0.3) {
-        const moundShape = new CANNON.Cylinder(ringRadius, ringRadius, ringHeight, 8);
-        const moundBody = new CANNON.Body({ mass: 0 });
-        moundBody.material = new CANNON.Material('ground');
-        moundBody.addShape(moundShape);
-        moundBody.position.set(x, ringY, z);
-        this.world.addBody(moundBody);
-      }
-    }
-  }
 
   private calculateGoalDirection() {
     // Calculate direction from ball start position to hole
@@ -703,7 +707,8 @@ export class GameEngine {
 
     const wallShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
     const wallBody = new CANNON.Body({ mass: 0 });
-    wallBody.material = new CANNON.Material('wall');
+    // Use bouncy material for Level 4 walls, regular wall material for others
+    wallBody.material = new CANNON.Material(this.currentLevel === 4 ? 'bouncyWall' : 'wall');
     wallBody.addShape(wallShape);
     wallBody.position.set(x, y, z);
     wallBody.quaternion.setFromEuler(pitch, yaw, 0, 'XYZ');
@@ -1157,6 +1162,7 @@ export class GameEngine {
         (this.ball.material as THREE.MeshLambertMaterial).transparent = true;
       }
     }
+    
     
     // Update first-person camera to follow ball
     this.updateFirstPersonCamera();
