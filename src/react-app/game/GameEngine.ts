@@ -125,7 +125,7 @@ export class GameEngine {
       ballMaterial,
       groundMaterial,
       {
-        friction: 0.8,
+        friction: 0.1, // Reduced friction as requested
         restitution: 0.2,
         frictionEquationStiffness: 1e7, // Reduced for stability
         frictionEquationRelaxation: 4,
@@ -258,15 +258,16 @@ export class GameEngine {
       const wallX = x + Math.cos(angle) * radius;
       const wallZ = z + Math.sin(angle) * radius;
       
-      // Visual wall segment - larger for better visibility, semi-transparent
-      const wallGeometry = new THREE.BoxGeometry(wallThickness * 1.5, height, wallThickness * 1.5);
+      // Visual wall segment - extend into ground to merge with floor
+      const extendedHeight = height + 0.5; // Add 0.5 units to go into ground
+      const wallGeometry = new THREE.BoxGeometry(wallThickness * 1.5, extendedHeight, wallThickness * 1.5);
       const wallMaterial = new THREE.MeshLambertMaterial({ 
         color: color,
         transparent: true,
         opacity: 0.7 // 70% opacity, 30% transparent
       });
       const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-      wall.position.set(wallX, y, wallZ);
+      wall.position.set(wallX, y - 0.25, wallZ); // Lower by 0.25 to merge with ground
       wall.rotation.y = angle;
       wall.castShadow = true;
       wall.receiveShadow = true;
@@ -278,7 +279,7 @@ export class GameEngine {
       const wallBody = new CANNON.Body({ mass: 0 });
       wallBody.material = new CANNON.Material('wall');
       wallBody.addShape(wallShape);
-      wallBody.position.set(wallX, y, wallZ);
+      wallBody.position.set(wallX, y, wallZ); // Keep physics at original position
       wallBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), angle);
       wallBody.type = CANNON.Body.KINEMATIC;
       this.world.addBody(wallBody);
@@ -625,100 +626,44 @@ export class GameEngine {
 
   private createRealisticHole(x: number, z: number) {
     const holeRadius = 0.54; // Standard golf hole radius (4.25 inches = ~0.54 units)
-    const holeDepth = 0.4; // Realistic hole depth
+    const holeDepth = 0.4; // Reasonable hole depth
     
-    // 1. Create the main hole cavity with tapered sides
-    const holeCavityGeometry = new THREE.CylinderGeometry(
-      holeRadius * 0.95, // Top radius slightly smaller
-      holeRadius * 0.85, // Bottom radius smaller for realistic taper
-      holeDepth * 2, 
-      32 // More segments for smoother circle
-    );
-    const holeCavityMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x0a0a0a,
-      transparent: true,
-      opacity: 0.95
+    // Create a clean, simple hole that looks professional
+    
+    // 1. Create the main hole opening - just a dark circle at ground level
+    const holeOpeningGeometry = new THREE.CircleGeometry(holeRadius, 32);
+    const holeOpeningMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x0a0a0a 
     });
-    const holeCavity = new THREE.Mesh(holeCavityGeometry, holeCavityMaterial);
-    holeCavity.position.set(x, -holeDepth, z);
-    holeCavity.receiveShadow = true;
-    this.scene.add(holeCavity);
+    const holeOpening = new THREE.Mesh(holeOpeningGeometry, holeOpeningMaterial);
+    holeOpening.rotation.x = -Math.PI / 2;
+    holeOpening.position.set(x, 0.24, z); // Just below ground level
+    holeOpening.receiveShadow = true;
+    this.scene.add(holeOpening);
 
-    // 2. Create hole rim/cup edge - the metal cup
-    const rimGeometry = new THREE.TorusGeometry(holeRadius + 0.02, 0.02, 8, 32);
-    const rimMaterial = new THREE.MeshPhongMaterial({ 
-      color: 0x888888,
-      shininess: 100,
-      specular: 0x444444
+    // 2. Create hole rim at ground level - simple and clean
+    const rimGeometry = new THREE.TorusGeometry(holeRadius + 0.01, 0.01, 8, 32);
+    const rimMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x444444
     });
     const rim = new THREE.Mesh(rimGeometry, rimMaterial);
-    rim.position.set(x, 0.01, z);
+    rim.position.set(x, 0.25, z); // Exactly at ground level
     rim.castShadow = true;
     rim.receiveShadow = true;
     this.scene.add(rim);
 
-    // 3. Create inner cup walls for realistic appearance
-    const cupWallGeometry = new THREE.CylinderGeometry(
-      holeRadius, 
-      holeRadius * 0.95, 
-      holeDepth * 1.8, 
-      32,
-      1,
-      true // Open ended
-    );
-    const cupWallMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x2a2a2a,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.8
-    });
-    const cupWall = new THREE.Mesh(cupWallGeometry, cupWallMaterial);
-    cupWall.position.set(x, -holeDepth * 0.9, z);
-    cupWall.receiveShadow = true;
-    this.scene.add(cupWall);
-
-    // 4. Create hole bottom
-    const holeBottomGeometry = new THREE.CircleGeometry(holeRadius * 0.85, 32);
-    const holeBottomMaterial = new THREE.MeshLambertMaterial({ 
-      color: 0x0a0a0a 
-    });
-    const holeBottom = new THREE.Mesh(holeBottomGeometry, holeBottomMaterial);
-    holeBottom.rotation.x = -Math.PI / 2;
-    holeBottom.position.set(x, -holeDepth * 2 + 0.05, z);
-    holeBottom.receiveShadow = true;
-    this.scene.add(holeBottom);
-
-    // 5. Create subtle grass depression around hole
-    const depressionGeometry = new THREE.RingGeometry(holeRadius + 0.05, holeRadius + 0.3, 32);
-    const depressionMaterial = new THREE.MeshLambertMaterial({ 
+    // 3. Create subtle grass wear around hole
+    const wearGeometry = new THREE.RingGeometry(holeRadius + 0.01, holeRadius + 0.15, 32);
+    const wearMaterial = new THREE.MeshLambertMaterial({ 
       color: 0x5a9c4a, // Slightly darker green
       transparent: true,
-      opacity: 0.7
+      opacity: 0.4
     });
-    const depression = new THREE.Mesh(depressionGeometry, depressionMaterial);
-    depression.rotation.x = -Math.PI / 2;
-    depression.position.set(x, 0.01, z);
-    depression.receiveShadow = true;
-    this.scene.add(depression);
-
-    // 6. Add some subtle wear marks around the hole
-    for (let i = 0; i < 3; i++) {
-      const angle = (i / 3) * Math.PI * 2;
-      const markRadius = holeRadius + 0.15 + Math.random() * 0.1;
-      const markX = x + Math.cos(angle) * markRadius;
-      const markZ = z + Math.sin(angle) * markRadius;
-      
-      const wearMarkGeometry = new THREE.CircleGeometry(0.05 + Math.random() * 0.03, 8);
-      const wearMarkMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x4a8c3a,
-        transparent: true,
-        opacity: 0.5
-      });
-      const wearMark = new THREE.Mesh(wearMarkGeometry, wearMarkMaterial);
-      wearMark.rotation.x = -Math.PI / 2;
-      wearMark.position.set(markX, 0.005, markZ);
-      this.scene.add(wearMark);
-    }
+    const wear = new THREE.Mesh(wearGeometry, wearMaterial);
+    wear.rotation.x = -Math.PI / 2;
+    wear.position.set(x, 0.251, z); // Slightly above ground
+    wear.receiveShadow = true;
+    this.scene.add(wear);
 
     // Physics setup - Create a more accurate collision detection
     this.createHolePhysics(x, z, holeRadius, holeDepth);
@@ -801,14 +746,17 @@ export class GameEngine {
 
   private createWall(x: number, y: number, z: number, width: number, height: number, depth: number, color: number = 0xF4A460) {
     // Visual wall - semi-transparent for better ball visibility
-    const wallGeometry = new THREE.BoxGeometry(width, height, depth);
+    // Extend wall height slightly below ground to merge with floor
+    const extendedHeight = height + 0.5; // Add 0.5 units to go into ground
+    const wallGeometry = new THREE.BoxGeometry(width, extendedHeight, depth);
     const wallMaterial = new THREE.MeshLambertMaterial({ 
       color: color,
       transparent: true,
       opacity: 0.7 // 70% opacity, 30% transparent
     });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-    wall.position.set(x, y, z);
+    // Position wall so it extends into the ground to merge with floor
+    wall.position.set(x, y - 0.25, z); // Lower by 0.25 to merge with ground
     wall.castShadow = true;
     wall.receiveShadow = true;
     this.scene.add(wall);
@@ -819,7 +767,7 @@ export class GameEngine {
     const wallBody = new CANNON.Body({ mass: 0 });
     wallBody.material = new CANNON.Material('wall');
     wallBody.addShape(wallShape);
-    wallBody.position.set(x, y, z);
+    wallBody.position.set(x, y, z); // Keep physics at original position
     // Make sure walls are solid and can't be passed through
     wallBody.type = CANNON.Body.KINEMATIC;
     this.world.addBody(wallBody);
@@ -827,14 +775,16 @@ export class GameEngine {
   }
   // Oriented wall helper matching yaw (Y) and pitch (X)
   private createRotatedWall(x: number, y: number, z: number, width: number, height: number, depth: number, yaw: number, pitch: number, color: number = 0xD2B48C) {
-    const wallGeometry = new THREE.BoxGeometry(width, height, depth);
+    // Extend wall height to merge with floor
+    const extendedHeight = height + 0.5; // Add 0.5 units to go into ground
+    const wallGeometry = new THREE.BoxGeometry(width, extendedHeight, depth);
     const wallMaterial = new THREE.MeshLambertMaterial({ 
       color,
       transparent: true,
       opacity: 0.7 // 70% opacity, 30% transparent
     });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-    wall.position.set(x, y, z);
+    wall.position.set(x, y - 0.25, z); // Lower by 0.25 to merge with ground
     wall.rotation.set(pitch, yaw, 0, 'XYZ');
     wall.castShadow = true;
     wall.receiveShadow = true;
@@ -845,7 +795,7 @@ export class GameEngine {
     const wallBody = new CANNON.Body({ mass: 0 });
     wallBody.material = new CANNON.Material('wall');
     wallBody.addShape(wallShape);
-    wallBody.position.set(x, y, z);
+    wallBody.position.set(x, y, z); // Keep physics at original position
     wallBody.quaternion.setFromEuler(pitch, yaw, 0, 'XYZ');
     wallBody.type = CANNON.Body.KINEMATIC;
     this.world.addBody(wallBody);

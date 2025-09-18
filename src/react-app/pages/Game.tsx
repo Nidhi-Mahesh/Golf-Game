@@ -283,32 +283,36 @@ export default function Game() {
                 </p>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col gap-3">
+                {/* First row - Replay button */}
                 <button
                   onClick={replayLevel}
-                  className="flex-1 flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                  className="w-full flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                 >
                   <Replay className="w-5 h-5" />
                   Replay
                 </button>
                 
-                {currentLevel < 5 && (
+                {/* Second row - Next Level and Go to Levels */}
+                <div className="flex gap-3">
+                  {currentLevel < 5 && (
+                    <button
+                      onClick={handleNextLevel}
+                      className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                      Next Level
+                    </button>
+                  )}
+
                   <button
-                    onClick={handleNextLevel}
-                    className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                    onClick={nextLevel} // This now navigates to /levels
+                    className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
                   >
                     <ArrowRight className="w-5 h-5" />
-                    Next Level
+                    Go to Levels
                   </button>
-                )}
-
-                <button
-                  onClick={nextLevel} // This now navigates to /levels
-                  className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  <ArrowRight className="w-5 h-5" />
-                  Go to Levels
-                </button>
+                </div>
               </div>
             </div>
           </div>
