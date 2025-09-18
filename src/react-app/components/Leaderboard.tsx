@@ -42,12 +42,12 @@ export default function Leaderboard({ maxEntries = 10 }: LeaderboardProps) {
       case 3:
         return 'bg-gradient-to-r from-amber-400 to-amber-600 text-white';
       default:
-        return 'bg-white/10 text-white';
+        return 'bg-white/15 text-white';
     }
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 shadow-xl">
+    <div className="bg-white/15 backdrop-blur-sm rounded-xl p-6 shadow-xl">
       <h2 className="text-2xl font-bold text-white mb-4 text-center flex items-center justify-center gap-2">
         <Trophy className="w-6 h-6 text-yellow-400" />
         Leaderboard
@@ -59,8 +59,8 @@ export default function Leaderboard({ maxEntries = 10 }: LeaderboardProps) {
           onClick={() => setSelectedLevel('overall')}
           className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
             selectedLevel === 'overall'
-              ? 'bg-white/20 text-white'
-              : 'bg-white/5 text-white/70 hover:bg-white/10'
+              ? 'bg-white/25 text-white'
+              : 'bg-white/8 text-white/70 hover:bg-white/15'
           }`}
         >
           Overall
@@ -71,8 +71,8 @@ export default function Leaderboard({ maxEntries = 10 }: LeaderboardProps) {
             onClick={() => setSelectedLevel(level)}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               selectedLevel === level
-                ? 'bg-white/20 text-white'
-                : 'bg-white/5 text-white/70 hover:bg-white/10'
+                ? 'bg-white/25 text-white'
+                : 'bg-white/8 text-white/70 hover:bg-white/15'
             }`}
           >
             Level {level}

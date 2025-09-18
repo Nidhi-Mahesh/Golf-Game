@@ -72,8 +72,8 @@ export default function Game() {
       const timer = setTimeout(() => setInstructionIntro(false), 1000);
       return () => clearTimeout(timer);
     }
-    if (currentLevel === 2) {
-      // Show boundary warning for level 2 for 3 seconds
+    if (currentLevel === 5) {
+      // Show boundary warning for level 5 (circular course) for 3 seconds
       setShowBoundaryWarning(true);
       const timer2 = setTimeout(() => setShowBoundaryWarning(false), 3000);
       return () => clearTimeout(timer2);
@@ -131,10 +131,11 @@ export default function Game() {
   };
 
   const getParForLevel = (level: number) => {
-    if (level === 1) return 3;
-    if (level === 2) return 4;
-    if (level === 3) return 5;
-    if (level === 4) return 4;
+    if (level === 1) return 3; // Simple 3-block layout
+    if (level === 2) return 5; // Bumpy terrain (was Level 3)
+    if (level === 3) return 4; // Curved slide (was Level 4)
+    if (level === 4) return 4; // Multi-tier platforms (new)
+    if (level === 5) return 4; // Circular course (was Level 2)
     return 3;
   };
 
@@ -165,7 +166,7 @@ export default function Game() {
         {/* Top HUD */}
         <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-auto">
           {/* Score Panel */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg">
+          <div className="bg-white/95 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg">
             <div className="text-lg font-bold text-gray-800">Level {currentLevel}</div>
             <div className="text-sm text-gray-600">Par {getParForLevel(currentLevel)} • Strokes: <span className="font-semibold">0</span></div>
           </div>
@@ -174,14 +175,14 @@ export default function Game() {
           <div className="flex gap-2">
             <button
               onClick={openPause}
-              className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg hover:bg-white/100 transition-colors"
+              className="bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg hover:bg-white/100 transition-colors"
               title="Pause"
             >
               <Pause className="w-5 h-5 text-gray-700" />
             </button>
             <button
               onClick={toggleMute}
-              className="bg-white/90 backdrop-blur-sm p-3 rounded-lg shadow-lg hover:bg-white/100 transition-colors"
+              className="bg-white/95 backdrop-blur-sm p-3 rounded-lg shadow-lg hover:bg-white/100 transition-colors"
               title="Toggle Sound"
             >
               <Volume2 className="w-5 h-5 text-gray-700" />
@@ -191,7 +192,7 @@ export default function Game() {
 
         {/* Power Meter */}
         <div className="absolute bottom-20 left-4 pointer-events-auto">
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg p-4 shadow-lg">
+          <div className="bg-white/95 backdrop-blur-sm rounded-lg p-4 shadow-lg">
             <div className="text-sm font-semibold text-gray-700 mb-2">Power</div>
             <div className="w-6 h-32 bg-gray-200 rounded-full relative overflow-hidden">
               <div 
@@ -209,8 +210,8 @@ export default function Game() {
             `absolute backdrop-blur-sm rounded-lg p-4 shadow-lg pointer-events-auto max-w-xs 
             transform-gpu will-change-transform transition-[transform,background-color,opacity,top,right,bottom,left] duration-1000 ease-[cubic-bezier(0.22,1,0.36,1)] 
             ${instructionIntro
-              ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-150 bg-white/90 z-50'
-              : 'bottom-4 right-4 translate-x-0 translate-y-0 scale-100 bg-white/20'}`
+              ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-150 bg-white/95 z-50'
+              : 'bottom-4 right-4 translate-x-0 translate-y-0 scale-100 bg-white/30'}`
           }
         >
           <div className="text-sm text-gray-700">
@@ -298,7 +299,7 @@ export default function Game() {
               <div className="space-y-3">
                 {/* Primary Actions */}
                 <div className="flex gap-2">
-                  {currentLevel < 4 && (
+                  {currentLevel < 5 && (
                     <button
                       onClick={handleNextLevel}
                       className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors"
@@ -331,7 +332,7 @@ export default function Game() {
         </div>
       )}
 
-      {/* Boundary Warning Modal for Level 2 */}
+      {/* Boundary Warning Modal for Level 5 */}
       {showBoundaryWarning && (
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto z-50">
           <div className="bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl transform animate-bounce">
@@ -343,7 +344,7 @@ export default function Game() {
               </div>
               
               <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                ⚠️ Level 2 Warning!
+                ⚠️ Level 5 Warning!
               </h2>
               
               <p className="text-lg text-gray-600 mb-2">

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom"; // fixed import
 import { Lock, Home as HomeIcon } from "lucide-react";
 
-const MAX_LEVELS = 4; // Game now has 4 levels
+const MAX_LEVELS = 5; // Game now has 5 levels
 
 interface LevelData {
   id: number;
@@ -20,14 +20,14 @@ export default function LevelSelectScreen() {
     const savedLevels = localStorage.getItem("levelsData");
     if (savedLevels) {
       const parsedLevels = JSON.parse(savedLevels);
-      // Filter to only include levels 1-4, removing any level 5 data
+      // Filter to only include levels 1-5, removing any higher level data
       const filteredLevels = parsedLevels.filter((level: LevelData) => level.id <= MAX_LEVELS);
       
       if (savedLevels !== lastLevelsJson || filteredLevels.length !== parsedLevels.length) {
         setLevels(filteredLevels);
         const newJson = JSON.stringify(filteredLevels);
         setLastLevelsJson(newJson);
-        // Update localStorage to remove level 5 if it existed
+        // Update localStorage to remove any levels beyond 5 if they existed
         localStorage.setItem('levelsData', newJson);
       }
     } else {
@@ -88,7 +88,7 @@ export default function LevelSelectScreen() {
         LEVEL SELECT
       </h1>
 
-      <div className="grid grid-cols-4 gap-4 max-w-lg mx-auto">
+      <div className="grid grid-cols-5 gap-4 max-w-2xl mx-auto">
         {levels.map((level) => (
           <button
             key={level.id}

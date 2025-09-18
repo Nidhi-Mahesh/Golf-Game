@@ -38,11 +38,13 @@ export class GameEngine {
       case 1:
         return { distance: 3.5, height: 1.4, fov: 70 };
       case 2:
-        return { distance: 3.8, height: 1.5, fov: 72 };
+        return { distance: 3.8, height: 1.5, fov: 72 }; // Was Level 3 (bumpy terrain)
       case 3:
-        return { distance: 4.0, height: 1.6, fov: 74 };
+        return { distance: 4.0, height: 1.6, fov: 74 }; // Was Level 4 (curved slide)
       case 4:
-        return { distance: 3.2, height: 1.3, fov: 68 };
+        return { distance: 3.2, height: 1.3, fov: 68 }; // New multi-tier level
+      case 5:
+        return { distance: 3.8, height: 1.5, fov: 72 }; // Was Level 2 (circular course)
       default:
         return { distance: 3.5, height: 1.4, fov: 70 };
     }
@@ -56,6 +58,10 @@ export class GameEngine {
   private holePosition = new THREE.Vector3(0, 0, -12); // Default hole position
   private currentLevel = 1;
   private onLevelComplete?: (level: number, strokes: number) => void;
+  
+  // Moving blocks for Level 4
+  private movingBlocks: { mesh: THREE.Mesh; body: CANNON.Body; startPos: THREE.Vector3; direction: THREE.Vector3; speed: number; range: number; }[] = [];
+  private movingBlockMaterial!: CANNON.Material;
 
   constructor(canvas: HTMLCanvasElement, level: number = 1, onLevelComplete?: (level: number, strokes: number) => void) {
     this.canvas = canvas;
@@ -121,7 +127,8 @@ export class GameEngine {
     const ballMaterial = new CANNON.Material('ball');
     const groundMaterial = new CANNON.Material('ground');
     const wallMaterial = new CANNON.Material('wall');
-    const bouncyWallMaterial = new CANNON.Material('bouncyWall'); // Super bouncy walls for Level 4
+    const bouncyWallMaterial = new CANNON.Material('bouncyWall'); // Super bouncy walls for Level 3
+    this.movingBlockMaterial = new CANNON.Material('movingBlock'); // Moving blocks for Level 4
     
     const ballGroundContact = new CANNON.ContactMaterial(
       ballMaterial,
@@ -147,7 +154,7 @@ export class GameEngine {
       }
     );
     
-    // Super bouncy walls for Level 4 - even more bouncy!
+    // Super bouncy walls for Level 3 - even more bouncy!
     const ballBouncyWallContact = new CANNON.ContactMaterial(
       ballMaterial,
       bouncyWallMaterial,
@@ -161,9 +168,24 @@ export class GameEngine {
       }
     );
     
+    // Wooden barriers for Level 4 - increased push/bounce force
+    const ballMovingBlockContact = new CANNON.ContactMaterial(
+      ballMaterial,
+      this.movingBlockMaterial,
+      {
+        friction: 0.3, // Slightly less friction for more sliding
+        restitution: 1.2, // Much stronger bounce - pushes ball back harder
+        frictionEquationStiffness: 1e10,
+        frictionEquationRelaxation: 2, // Faster response
+        contactEquationStiffness: 1e10,
+        contactEquationRelaxation: 2
+      }
+    );
+    
     this.world.addContactMaterial(ballGroundContact);
     this.world.addContactMaterial(ballWallContact);
     this.world.addContactMaterial(ballBouncyWallContact);
+    this.world.addContactMaterial(ballMovingBlockContact);
   }
 
   private setupLighting() {
@@ -200,15 +222,18 @@ export class GameEngine {
         this.setupLevel1();
         break;
       case 2:
-        this.ballStartPos = new THREE.Vector3(0, 0.3, 15); // Ball radius above ground surface
+        this.ballStartPos = new THREE.Vector3(0, 0.3, 12); // Ball radius above ground surface (was Level 3)
         this.setupLevel2();
         break;
       case 3:
-        this.ballStartPos = new THREE.Vector3(0, 0.3, 12); // Ball radius above ground surface
-        this.setupLevel3();
+        this.setupLevel3(); // Level 3 sets its own ball position (was Level 4)
         break;
       case 4:
-        this.setupLevel4(); // Level 4 sets its own ball position
+        this.setupLevel4(); // Level 4 stays the same
+        break;
+      case 5:
+        this.ballStartPos = new THREE.Vector3(0, 0.3, 15); // Ball radius above ground surface (was Level 2)
+        this.setupLevel5();
         break;
     }
     // Calculate goal direction for first-person camera
@@ -239,16 +264,23 @@ export class GameEngine {
     this.createWall(10.75, 1, 0, 1, 2, 31, 0xD2B48C); // Right wall
     this.createWall(-10.75, 1, 0, 1, 2, 31, 0xD2B48C); // Left wall
 
-    // Level 1 obstacles
-    this.createWall(-5, 0.75, 5, 2, 1.5, 8, 0xE9806E); // Left obstacle
-    this.createWall(5, 0.75, -2, 6, 1.5, 2, 0xA2C7E5); // Right obstacle
-    this.createWall(0, 0.75, 0, 8, 1.5, 2, 0xF5B82E); // Center obstacle
+    // Level 1 obstacles - Simple 3-block layout (transparent)
+    // Clean design: 1 center block, 2 side blocks
+    
+    // Left side block
+    this.createWall(-5, 0.75, 2, 3, 1.5, 4, 0xE9806E); // Left obstacle
+    
+    // Right side block  
+    this.createWall(5, 0.75, -2, 3, 1.5, 4, 0xA2C7E5); // Right obstacle
+    
+    // Center block
+    this.createWall(0, 0.75, -6, 4, 1.5, 3, 0xF5B82E); // Center obstacle
 
     this.createHole(0, -12);
   }
 
-  private setupLevel2() {
-    // Circular ground - thinner
+  private setupLevel5() {
+    // Circular ground - thinner (advanced level - was Level 2)
     const radius = 18;
     const groundGeometry = new THREE.CylinderGeometry(radius, radius, 0.1, 32);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
@@ -267,7 +299,7 @@ export class GameEngine {
     // Circular boundary wall
     this.createCircularWall(0, 1, 0, radius + 1, 2, 0xD2B48C);
 
-    // Level 2 obstacles - reduced for easier navigation
+    // Level 5 obstacles - challenging circular course navigation
     this.createWall(0, 0.75, 3, 3, 1.5, 2, 0xA2C7E5); // Center obstacle
     this.createWall(-5, 0.75, -5, 2, 1.5, 3, 0xF5B82E); // Left obstacle
     this.createWall(5, 0.75, -5, 2, 1.5, 3, 0xE9806E); // Right obstacle
@@ -313,8 +345,8 @@ export class GameEngine {
     }
   }
 
-  private setupLevel3() {
-    // Larger ground for level 3 - thinner
+  private setupLevel2() {
+    // Larger ground for level 2 - thinner (bumpy terrain - was Level 3)
     const groundGeometry = new THREE.BoxGeometry(30, 0.1, 40);
     const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
@@ -341,8 +373,8 @@ export class GameEngine {
     this.createHole(0, -18);
   }
 
-  private setupLevel4() {
-    // Curved slide course: a curving track with continuous side walls
+  private setupLevel3() {
+    // Curved slide course: a curving track with continuous side walls (was Level 4)
     const segments = 72; // More segments for smoother curve
     const trackWidth = 7; // playable width
     const wallHeight = 3.5;
@@ -457,9 +489,9 @@ export class GameEngine {
     const startYaw = Math.atan2(startDir.x, startDir.z);
     const startSlope = 0; // first segments are flat
 
-    // Place ball just before a small aligned starter lip
-    const backOffset = startDir.clone().multiplyScalar(0.3);
-    this.ballStartPos = new THREE.Vector3(startPoint.x - backOffset.x, 0.3, startPoint.z - backOffset.z);
+    // Place ball in a very safe starting position on the track
+    // Use a simple, guaranteed safe position at the start of the slide
+    this.ballStartPos = new THREE.Vector3(0, 1.0, 12); // Center of track, well above surface, at starting Z position
 
     // Starter lip removed to prevent blocking ball movement
 
@@ -508,6 +540,179 @@ export class GameEngine {
     };
     placeNub(1);
     placeNub(-1);
+  }
+
+  private setupLevel4() {
+    // Simple ground level with moving blocks only
+    this.ballStartPos = new THREE.Vector3(0, 0.3, 10);
+    
+    // Ground - main platform
+    const groundGeometry = new THREE.BoxGeometry(25, 0.1, 35);
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
+    this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    this.ground.receiveShadow = true;
+    this.scene.add(this.ground);
+
+    // Ground physics
+    const groundShape = new CANNON.Box(new CANNON.Vec3(12.5, 0.05, 17.5));
+    const groundBody = new CANNON.Body({ mass: 0 });
+    groundBody.material = new CANNON.Material('ground');
+    groundBody.addShape(groundShape);
+    groundBody.position.set(0, -0.05, 0);
+    this.world.addBody(groundBody);
+
+    // Course boundaries
+    this.createWall(0, 1, 17.75, 25.5, 2, 1, 0xD2B48C); // Back wall
+    this.createWall(0, 1, -17.75, 25.5, 2, 1, 0xD2B48C); // Front wall
+    this.createWall(12.75, 1, 0, 1, 2, 36, 0xD2B48C); // Right wall
+    this.createWall(-12.75, 1, 0, 1, 2, 36, 0xD2B48C); // Left wall
+    
+    // Add strategic wooden barriers that move in fixed paths
+    // These barriers create timing challenges without blocking the hole directly
+    
+    // Barrier 1: Horizontal gate in middle section - blocks main path
+    this.createWoodenBarrier(0, 0.4, 2, 6, 0.8, 1, new THREE.Vector3(1, 0, 0), 2.2, 10); // Much faster, constrained to course width
+    
+    // Barrier 2: Left side patrol - covers left approach
+    this.createWoodenBarrier(-8, 0.4, -2, 4, 0.8, 1.5, new THREE.Vector3(1, 0, 0), 2.5, 6); // Faster, stays within left side
+    
+    // Barrier 3: Right side patrol - covers right approach
+    this.createWoodenBarrier(8, 0.4, -6, 4, 0.8, 1.5, new THREE.Vector3(1, 0, 0), 2.3, 6); // Faster, stays within right side
+
+    this.createHole(0, -14);
+  }
+
+  private createElevatedPlatform(x: number, y: number, z: number, width: number, height: number, depth: number, color: number) {
+    // Visual platform
+    const platformGeometry = new THREE.BoxGeometry(width, height, depth);
+    const platformMaterial = new THREE.MeshLambertMaterial({ 
+      color: color,
+      transparent: true,
+      opacity: 0.8
+    });
+    const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+    platform.position.set(x, y, z);
+    platform.castShadow = true;
+    platform.receiveShadow = true;
+    this.scene.add(platform);
+    this.walls.push(platform);
+
+    // Physics platform
+    const platformShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+    const platformBody = new CANNON.Body({ mass: 0 });
+    platformBody.material = new CANNON.Material('ground');
+    platformBody.addShape(platformShape);
+    platformBody.position.set(x, y, z);
+    platformBody.type = CANNON.Body.KINEMATIC;
+    this.world.addBody(platformBody);
+    this.wallBodies.push(platformBody);
+  }
+
+  private createRamp(x: number, y: number, z: number, width: number, height: number, depth: number, color: number) {
+    // Visual ramp
+    const rampGeometry = new THREE.BoxGeometry(width, height, depth);
+    const rampMaterial = new THREE.MeshLambertMaterial({ 
+      color: color,
+      transparent: true,
+      opacity: 0.7
+    });
+    const ramp = new THREE.Mesh(rampGeometry, rampMaterial);
+    ramp.position.set(x, y, z);
+    ramp.rotation.x = -Math.PI / 8; // 22.5 degree slope
+    ramp.castShadow = true;
+    ramp.receiveShadow = true;
+    this.scene.add(ramp);
+    this.walls.push(ramp);
+
+    // Physics ramp
+    const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+    const rampBody = new CANNON.Body({ mass: 0 });
+    rampBody.material = new CANNON.Material('ground');
+    rampBody.addShape(rampShape);
+    rampBody.position.set(x, y, z);
+    rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
+    rampBody.type = CANNON.Body.KINEMATIC;
+    this.world.addBody(rampBody);
+    this.wallBodies.push(rampBody);
+  }
+
+  private createWoodenBarrier(x: number, y: number, z: number, width: number, height: number, depth: number, direction: THREE.Vector3, speed: number, range: number) {
+    // Create realistic wooden barrier with proper wood texture and appearance
+    const barrierGeometry = new THREE.BoxGeometry(width, height, depth);
+    
+    // Wooden material with realistic brown wood color and subtle texture
+    const woodMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x8B4513, // Saddle brown - natural wood color
+      transparent: false,
+      opacity: 1.0
+    });
+    
+    const barrier = new THREE.Mesh(barrierGeometry, woodMaterial);
+    barrier.position.set(x, y, z);
+    barrier.castShadow = true;
+    barrier.receiveShadow = true;
+    this.scene.add(barrier);
+    this.walls.push(barrier);
+    
+    // Add wood grain effect with darker edges
+    const edgeGeometry = new THREE.BoxGeometry(width * 1.02, height * 1.02, depth * 1.02);
+    const edgeMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x654321, // Darker brown for wood edges
+      transparent: true,
+      opacity: 0.3
+    });
+    const edge = new THREE.Mesh(edgeGeometry, edgeMaterial);
+    edge.position.set(x, y, z);
+    edge.castShadow = true;
+    this.scene.add(edge);
+    this.walls.push(edge);
+
+    // Physics barrier - solid and bouncy like real wood
+    const barrierShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+    const barrierBody = new CANNON.Body({ mass: 0 }); // Kinematic body
+    barrierBody.material = this.movingBlockMaterial;
+    barrierBody.addShape(barrierShape);
+    barrierBody.position.set(x, y, z);
+    barrierBody.type = CANNON.Body.KINEMATIC;
+    this.world.addBody(barrierBody);
+    this.wallBodies.push(barrierBody);
+
+    // Store barrier data for fixed-path animation
+    this.movingBlocks.push({
+      mesh: barrier,
+      body: barrierBody,
+      startPos: new THREE.Vector3(x, y, z),
+      direction: direction.clone().normalize(),
+      speed: speed,
+      range: range
+    });
+  }
+
+  private updateMovingBlocks(deltaTime: number) {
+    const time = Date.now() * 0.001; // Convert to seconds for smoother animation
+    
+    this.movingBlocks.forEach((block, index) => {
+      // Create strategic fixed-path movement that blocks the hole
+      // Each barrier has a different timing to create windows of opportunity
+      const phase = time * block.speed + (index * Math.PI / 3); // Staggered timing for strategic gaps
+      
+      // Use sine wave for smooth back-and-forth movement
+      const offset = Math.sin(phase) * block.range;
+      
+      // Calculate new position along the fixed path
+      const newPos = block.startPos.clone().add(
+        block.direction.clone().multiplyScalar(offset)
+      );
+      
+      // Update visual mesh position
+      block.mesh.position.copy(newPos);
+      
+      // Update physics body position
+      block.body.position.set(newPos.x, newPos.y, newPos.z);
+      
+      // No rotation for wooden barriers - keep them stable and realistic
+      // Wooden barriers should look solid and predictable
+    });
   }
 
   private createRandomBumps() {
@@ -1109,6 +1314,11 @@ export class GameEngine {
     // Clamp deltaTime to prevent physics instability
     const clampedDeltaTime = Math.min(deltaTime, 1/30); // Max 30fps minimum
     
+    // Update moving blocks animation (Level 4)
+    if (this.currentLevel === 4) {
+      this.updateMovingBlocks(clampedDeltaTime);
+    }
+    
     // Update physics with fixed timestep for stability
     this.world.step(clampedDeltaTime);
     
@@ -1155,6 +1365,17 @@ export class GameEngine {
     } else if (currentLevel === 3) {
       // Level 3 boundaries - larger area
       if (ballPosition.x > 15.5 || ballPosition.x < -15.5 || ballPosition.z > 20.5 || ballPosition.z < -20.5 || ballPosition.y < -5) {
+        outOfBounds = true;
+      }
+    } else if (currentLevel === 4) {
+      // Level 4 boundaries - multi-tier level
+      if (ballPosition.x > 12.5 || ballPosition.x < -12.5 || ballPosition.z > 17.5 || ballPosition.z < -17.5 || ballPosition.y < -5) {
+        outOfBounds = true;
+      }
+    } else if (currentLevel === 5) {
+      // Level 5 circular boundaries (was Level 2)
+      const distanceFromCenter = Math.sqrt(ballPosition.x * ballPosition.x + ballPosition.z * ballPosition.z);
+      if (distanceFromCenter > 19 || ballPosition.y < -5) {
         outOfBounds = true;
       }
     }
@@ -1507,6 +1728,14 @@ export class GameEngine {
 
   public dispose() {
     this.renderer.dispose();
+    
+    // Clean up moving blocks
+    this.movingBlocks.forEach(block => {
+      this.scene.remove(block.mesh);
+      this.world.removeBody(block.body);
+    });
+    this.movingBlocks = [];
+    
     // Clean up other resources
   }
 }
