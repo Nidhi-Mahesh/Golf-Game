@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Lock } from 'lucide-react';
 
-const MAX_LEVELS = 5; // Keep grid but ensure level 4 exists visually
+const MAX_LEVELS = 4; // Game now has 4 levels
 
 interface LevelData {
   id: number;
@@ -19,9 +19,16 @@ export default function LevelSelectScreen() {
   const loadLevels = () => {
     const savedLevels = localStorage.getItem('levelsData');
     if (savedLevels) {
-      if (savedLevels !== lastLevelsJson) {
-        setLevels(JSON.parse(savedLevels));
-        setLastLevelsJson(savedLevels);
+      const parsedLevels = JSON.parse(savedLevels);
+      // Filter to only include levels 1-4, removing any level 5 data
+      const filteredLevels = parsedLevels.filter((level: LevelData) => level.id <= MAX_LEVELS);
+      
+      if (savedLevels !== lastLevelsJson || filteredLevels.length !== parsedLevels.length) {
+        setLevels(filteredLevels);
+        const newJson = JSON.stringify(filteredLevels);
+        setLastLevelsJson(newJson);
+        // Update localStorage to remove level 5 if it existed
+        localStorage.setItem('levelsData', newJson);
       }
     } else {
       const initialLevels: LevelData[] = Array.from({ length: MAX_LEVELS }, (_, i) => ({

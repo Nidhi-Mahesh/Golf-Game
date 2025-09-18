@@ -433,33 +433,12 @@ export class GameEngine {
     const backOffset = startDir.clone().multiplyScalar(0.3);
     this.ballStartPos = new THREE.Vector3(startPoint.x - backOffset.x, 1.2, startPoint.z - backOffset.z);
 
-    // Starter lip aligned to the track (visual)
-    const lipDepth = 0.7;
-    const lipHeight = 0.5;
-    const lipGeom = new THREE.BoxGeometry(trackWidth, lipHeight, lipDepth);
-    const lipMat = new THREE.MeshLambertMaterial({ color: 0xC9A671 });
-    const lip = new THREE.Mesh(lipGeom, lipMat);
-    const lipOffset = startDir.clone().multiplyScalar(0.6);
-    lip.position.set(startPoint.x + lipOffset.x, lipHeight / 2 - 0.05, startPoint.z + lipOffset.z);
-    lip.rotation.y = startYaw;
-    lip.rotation.x = startSlope;
-    lip.castShadow = true;
-    lip.receiveShadow = true;
-    this.scene.add(lip);
-
-    // Starter lip (physics)
-    const lipShape = new CANNON.Box(new CANNON.Vec3(trackWidth / 2, lipHeight / 2, lipDepth / 2));
-    const lipBody = new CANNON.Body({ mass: 0 });
-    lipBody.material = new CANNON.Material('ground');
-    lipBody.addShape(lipShape);
-    lipBody.position.set(lip.position.x, lip.position.y, lip.position.z);
-    lipBody.quaternion.setFromEuler(startSlope, startYaw, 0, 'XYZ');
-    lipBody.type = CANNON.Body.KINEMATIC;
-    this.world.addBody(lipBody);
+    // Starter lip removed to prevent blocking ball movement
 
     // Backstop behind the ball to prevent any backward drift
     const backLipDepth = 0.6;
     const backLipHeight = 0.5;
+    const lipMat = new THREE.MeshLambertMaterial({ color: 0xC9A671 });
     const backLipGeom = new THREE.BoxGeometry(trackWidth * 0.5, backLipHeight, backLipDepth);
     const backLip = new THREE.Mesh(backLipGeom, lipMat);
     const backLipOffset = startDir.clone().multiplyScalar(-0.5);
@@ -748,8 +727,8 @@ export class GameEngine {
     this.ballBody.material = new CANNON.Material('ball');
     this.ballBody.addShape(ballShape);
     this.ballBody.position.set(this.ballStartPos.x, this.ballStartPos.y, this.ballStartPos.z);
-    this.ballBody.linearDamping = 0.4;
-    this.ballBody.angularDamping = 0.4;
+    this.ballBody.linearDamping = 0.5;
+    this.ballBody.angularDamping = 0.5;
     this.world.addBody(this.ballBody);
   }
 
