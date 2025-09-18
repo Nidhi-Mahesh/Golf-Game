@@ -134,8 +134,7 @@ export default function Game() {
     if (level === 1) return 3;
     if (level === 2) return 4;
     if (level === 3) return 5;
-    if (level === 4) return 4; // Example par for level 4
-    if (level === 5) return 5; // Example par for level 5
+    if (level === 4) return 4;
     return 3;
   };
 
@@ -259,60 +258,73 @@ export default function Game() {
 
       {/* Congratulations Modal */}
       {showCongrats && (
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center pointer-events-auto z-50">
-          <div className="bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl transform animate-pulse">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center pointer-events-auto z-50 p-4">
+          <div className="bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl border border-gray-100">
             <div className="text-center">
+              {/* Trophy Icon */}
               <div className="mb-4">
-                <Trophy className="w-16 h-16 text-yellow-500 mx-auto" />
+                <Trophy className="w-12 h-12 text-yellow-500 mx-auto" />
               </div>
               
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                🎉 Congratulations! 🎉
-              </h2>
-              
-              <p className="text-lg text-gray-600 mb-2">
-                Level {currentLevel} Complete!
-              </p>
-              
-              <div className="bg-green-50 rounded-lg p-4 mb-6">
-                <p className="text-lg font-semibold text-green-800">
-                  {completedStrokes} strokes
+              {/* Main Title */}
+              <div className="mb-4">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                  🎉 Congratulations! 🎉
+                </h2>
+                <p className="text-lg text-gray-600">
+                  Level {currentLevel} Complete!
                 </p>
-                <p className="text-sm text-green-600">
+              </div>
+              
+              {/* Score Card */}
+              <div className="bg-green-50 rounded-xl p-4 mb-5 border border-green-200">
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <span className="text-lg font-bold text-white">{completedStrokes}</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs text-green-600 font-medium uppercase">Strokes</p>
+                    <p className="text-sm font-bold text-green-800">
+                      Par {getParForLevel(currentLevel)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-sm font-semibold text-green-800">
                   {getScoreDescription(completedStrokes, getParForLevel(currentLevel))}
                 </p>
               </div>
 
-              <div className="flex flex-col gap-3">
-                {/* First row - Replay button */}
-                <button
-                  onClick={replayLevel}
-                  className="w-full flex items-center justify-center gap-2 bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
-                >
-                  <Replay className="w-5 h-5" />
-                  Replay
-                </button>
-                
-                {/* Second row - Next Level and Go to Levels */}
-                <div className="flex gap-3">
-                  {currentLevel < 5 && (
+              {/* Action Buttons */}
+              <div className="space-y-3">
+                {/* Primary Actions */}
+                <div className="flex gap-2">
+                  {currentLevel < 4 && (
                     <button
                       onClick={handleNextLevel}
-                      className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors"
                     >
-                      <ArrowRight className="w-5 h-5" />
-                      Next Level
+                      <ArrowRight className="w-4 h-4" />
+                      Next
                     </button>
                   )}
-
+                  
                   <button
-                    onClick={nextLevel} // This now navigates to /levels
-                    className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+                    onClick={nextLevel}
+                    className="flex-1 flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-lg font-semibold text-sm transition-colors"
                   >
-                    <ArrowRight className="w-5 h-5" />
-                    Go to Levels
+                    <ArrowRight className="w-4 h-4" />
+                    Levels
                   </button>
                 </div>
+                
+                {/* Secondary Action */}
+                <button
+                  onClick={replayLevel}
+                  className="w-full flex items-center justify-center gap-2 bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                >
+                  <Replay className="w-4 h-4" />
+                  Replay
+                </button>
               </div>
             </div>
           </div>
