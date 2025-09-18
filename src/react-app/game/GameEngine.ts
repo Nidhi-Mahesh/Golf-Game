@@ -616,30 +616,149 @@ export class GameEngine {
     // Store hole position for camera calculations
     this.holePosition.set(x, 0, z);
     
-    // Create hole depression in ground (smaller hole)
-    const holeDepthGeometry = new THREE.CylinderGeometry(0.6, 0.6, 1.5, 16);
-    const holeDepthMaterial = new THREE.MeshLambertMaterial({ color: 0x0a0a0a });
-    const holeDepth = new THREE.Mesh(holeDepthGeometry, holeDepthMaterial);
-    holeDepth.position.set(x, -0.5, z);
-    this.scene.add(holeDepth);
-
-    // Create hole rim (smaller)
-    const holeRimGeometry = new THREE.RingGeometry(0.6, 0.8, 16);
-    const holeRimMaterial = new THREE.MeshLambertMaterial({ color: 0x6BA54A });
-    const holeRim = new THREE.Mesh(holeRimGeometry, holeRimMaterial);
-    holeRim.rotation.x = -Math.PI / 2;
-    holeRim.position.set(x, 0.26, z);
-    this.scene.add(holeRim);
-
-    // Hole physics (trigger zone for detection)
-    const holeShape = new CANNON.Cylinder(0.65, 0.65, 0.5, 8);
-    this.holeBody = new CANNON.Body({ mass: 0, isTrigger: true });
-    this.holeBody.addShape(holeShape);
-    this.holeBody.position.set(x, 0.1, z);
-    this.world.addBody(this.holeBody);
-
+    // Create realistic hole with multiple layers for depth
+    this.createRealisticHole(x, z);
+    
     // Create flag
     this.createFlag(x, z);
+  }
+
+  private createRealisticHole(x: number, z: number) {
+    const holeRadius = 0.54; // Standard golf hole radius (4.25 inches = ~0.54 units)
+    const holeDepth = 0.4; // Realistic hole depth
+    
+    // 1. Create the main hole cavity with tapered sides
+    const holeCavityGeometry = new THREE.CylinderGeometry(
+      holeRadius * 0.95, // Top radius slightly smaller
+      holeRadius * 0.85, // Bottom radius smaller for realistic taper
+      holeDepth * 2, 
+      32 // More segments for smoother circle
+    );
+    const holeCavityMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x0a0a0a,
+      transparent: true,
+      opacity: 0.95
+    });
+    const holeCavity = new THREE.Mesh(holeCavityGeometry, holeCavityMaterial);
+    holeCavity.position.set(x, -holeDepth, z);
+    holeCavity.receiveShadow = true;
+    this.scene.add(holeCavity);
+
+    // 2. Create hole rim/cup edge - the metal cup
+    const rimGeometry = new THREE.TorusGeometry(holeRadius + 0.02, 0.02, 8, 32);
+    const rimMaterial = new THREE.MeshPhongMaterial({ 
+      color: 0x888888,
+      shininess: 100,
+      specular: 0x444444
+    });
+    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
+    rim.position.set(x, 0.01, z);
+    rim.castShadow = true;
+    rim.receiveShadow = true;
+    this.scene.add(rim);
+
+    // 3. Create inner cup walls for realistic appearance
+    const cupWallGeometry = new THREE.CylinderGeometry(
+      holeRadius, 
+      holeRadius * 0.95, 
+      holeDepth * 1.8, 
+      32,
+      1,
+      true // Open ended
+    );
+    const cupWallMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x2a2a2a,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8
+    });
+    const cupWall = new THREE.Mesh(cupWallGeometry, cupWallMaterial);
+    cupWall.position.set(x, -holeDepth * 0.9, z);
+    cupWall.receiveShadow = true;
+    this.scene.add(cupWall);
+
+    // 4. Create hole bottom
+    const holeBottomGeometry = new THREE.CircleGeometry(holeRadius * 0.85, 32);
+    const holeBottomMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x0a0a0a 
+    });
+    const holeBottom = new THREE.Mesh(holeBottomGeometry, holeBottomMaterial);
+    holeBottom.rotation.x = -Math.PI / 2;
+    holeBottom.position.set(x, -holeDepth * 2 + 0.05, z);
+    holeBottom.receiveShadow = true;
+    this.scene.add(holeBottom);
+
+    // 5. Create subtle grass depression around hole
+    const depressionGeometry = new THREE.RingGeometry(holeRadius + 0.05, holeRadius + 0.3, 32);
+    const depressionMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x5a9c4a, // Slightly darker green
+      transparent: true,
+      opacity: 0.7
+    });
+    const depression = new THREE.Mesh(depressionGeometry, depressionMaterial);
+    depression.rotation.x = -Math.PI / 2;
+    depression.position.set(x, 0.01, z);
+    depression.receiveShadow = true;
+    this.scene.add(depression);
+
+    // 6. Add some subtle wear marks around the hole
+    for (let i = 0; i < 3; i++) {
+      const angle = (i / 3) * Math.PI * 2;
+      const markRadius = holeRadius + 0.15 + Math.random() * 0.1;
+      const markX = x + Math.cos(angle) * markRadius;
+      const markZ = z + Math.sin(angle) * markRadius;
+      
+      const wearMarkGeometry = new THREE.CircleGeometry(0.05 + Math.random() * 0.03, 8);
+      const wearMarkMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x4a8c3a,
+        transparent: true,
+        opacity: 0.5
+      });
+      const wearMark = new THREE.Mesh(wearMarkGeometry, wearMarkMaterial);
+      wearMark.rotation.x = -Math.PI / 2;
+      wearMark.position.set(markX, 0.005, markZ);
+      this.scene.add(wearMark);
+    }
+
+    // Physics setup - Create a more accurate collision detection
+    this.createHolePhysics(x, z, holeRadius, holeDepth);
+  }
+
+  private createHolePhysics(x: number, z: number, radius: number, depth: number) {
+    // Main hole trigger zone - slightly larger than visual hole
+    const holeShape = new CANNON.Cylinder(radius + 0.1, radius + 0.1, depth, 16);
+    this.holeBody = new CANNON.Body({ mass: 0, isTrigger: true });
+    this.holeBody.addShape(holeShape);
+    this.holeBody.position.set(x, -depth * 0.5, z);
+    this.world.addBody(this.holeBody);
+
+    // Create invisible collision walls around the hole rim for more realistic ball interaction
+    const rimSegments = 16;
+    for (let i = 0; i < rimSegments; i++) {
+      const angle = (i / rimSegments) * Math.PI * 2;
+      const rimX = x + Math.cos(angle) * (radius + 0.03);
+      const rimZ = z + Math.sin(angle) * (radius + 0.03);
+      
+      const rimCollisionShape = new CANNON.Box(new CANNON.Vec3(0.02, 0.02, 0.02));
+      const rimCollisionBody = new CANNON.Body({ mass: 0 });
+      rimCollisionBody.material = new CANNON.Material('rim');
+      rimCollisionBody.addShape(rimCollisionShape);
+      rimCollisionBody.position.set(rimX, 0.02, rimZ);
+      this.world.addBody(rimCollisionBody);
+
+      // Add contact material for rim interaction
+      const ballRimContact = new CANNON.ContactMaterial(
+        new CANNON.Material('ball'),
+        new CANNON.Material('rim'),
+        {
+          friction: 0.3,
+          restitution: 0.4,
+          frictionEquationStiffness: 1e7,
+          frictionEquationRelaxation: 3
+        }
+      );
+      this.world.addContactMaterial(ballRimContact);
+    }
   }
 
   private createFlag(x: number, z: number) {
@@ -1022,6 +1141,7 @@ export class GameEngine {
     this.ballBody.angularVelocity.set(0, 0, 0);
     this.ball.position.copy(this.ballStartPos);
     this.ball.visible = true;
+    this.ball.scale.set(1, 1, 1); // Reset ball scale
     (this.ball.material as THREE.MeshLambertMaterial).opacity = 1;
     (this.ball.material as THREE.MeshLambertMaterial).transparent = false;
     this.ballInHole = false;
@@ -1111,7 +1231,7 @@ export class GameEngine {
       return;
     }
 
-    // Check for hole collision - physics-based detection
+    // Enhanced hole collision detection with realistic physics
     if (!this.ballInHole) {
       const holePos = this.holeBody.position;
       const distanceToHole = Math.sqrt(
@@ -1120,23 +1240,62 @@ export class GameEngine {
       );
       const ballY = ballPosition.y;
       const ballSpeed = this.ballBody.velocity.length();
+      const holeRadius = 0.54;
       
-      // Ball enters hole if it's close enough to the center and at ground level
-      if (distanceToHole < 0.7 && ballY <= 0.5 && ballY > -0.1) {
+      // Create realistic hole entry conditions
+      const isNearHole = distanceToHole < holeRadius + 0.1;
+      const isAtGroundLevel = ballY <= 0.35 && ballY > -0.05;
+      const isSlowEnough = ballSpeed < 8; // Prevent fast balls from jumping over
+      
+      // Ball enters hole with more realistic conditions
+      if (isNearHole && isAtGroundLevel && distanceToHole < holeRadius) {
         this.ballInHole = true;
         console.log(`Ball entered hole! Distance: ${distanceToHole.toFixed(2)}, Speed: ${ballSpeed.toFixed(2)}`);
+        
+        // Add satisfying hole entry effects
+        this.createHoleEntryEffects(ballPosition.x, ballPosition.z);
         
         // Trigger completion immediately when ball enters hole
         this.onHoleCompleted();
         
-        // Reduce horizontal velocity significantly to simulate falling into hole
-        this.ballBody.velocity.x *= 0.1;
-        this.ballBody.velocity.z *= 0.1;
-        this.ballBody.angularVelocity.scale(0.2);
+        // More realistic hole entry physics
+        this.ballBody.velocity.x *= 0.05;
+        this.ballBody.velocity.z *= 0.05;
+        this.ballBody.velocity.y = Math.min(this.ballBody.velocity.y, -2); // Ensure downward motion
+        this.ballBody.angularVelocity.scale(0.1);
+      }
+      // Ball approaches hole - create attraction effect for realism
+      else if (isNearHole && isAtGroundLevel && distanceToHole < holeRadius + 0.2 && ballSpeed < 3) {
+        // Subtle attraction force toward hole center (like real golf)
+        const attractionStrength = 0.8 * (1 - distanceToHole / (holeRadius + 0.2));
+        const directionX = (holePos.x - ballPosition.x) / distanceToHole;
+        const directionZ = (holePos.z - ballPosition.z) / distanceToHole;
+        
+        this.ballBody.applyForce(
+          new CANNON.Vec3(
+            directionX * attractionStrength,
+            0,
+            directionZ * attractionStrength
+          )
+        );
+      }
+      // Ball hits rim - realistic rim interaction
+      else if (distanceToHole > holeRadius - 0.05 && distanceToHole < holeRadius + 0.08 && isAtGroundLevel) {
+        // Ball hits the rim - add slight upward bounce and deflection
+        const rimNormalX = (ballPosition.x - holePos.x) / distanceToHole;
+        const rimNormalZ = (ballPosition.z - holePos.z) / distanceToHole;
+        
+        // Add rim bounce effect
+        this.ballBody.velocity.x += rimNormalX * 0.5;
+        this.ballBody.velocity.z += rimNormalZ * 0.5;
+        this.ballBody.velocity.y += 0.3; // Small upward bounce
+        
+        // Create rim hit effect
+        this.createRimHitEffect(ballPosition.x, ballPosition.z);
       }
     }
 
-    // Physics-based hole falling animation
+    // Enhanced physics-based hole falling animation
     if (this.ballInHole) {
       const ballPos = this.ballBody.position;
       const holePos = this.holeBody.position;
@@ -1148,34 +1307,65 @@ export class GameEngine {
         Math.pow(ballPos.z - holePos.z, 2)
       );
       
-      // Apply forces to pull ball toward hole center and down
-      if (ballY > -1.5) {
-        // Horizontal pull toward hole center
-        if (distanceToHoleCenter > 0.05) {
-          const pullForceX = (holePos.x - ballPos.x) * 8;
-          const pullForceZ = (holePos.z - ballPos.z) * 8;
+      // More realistic hole falling physics
+      if (ballY > -0.8) {
+        // Spiral effect as ball falls into hole
+        const spiralForce = 0.5 * (1 - ballY / -0.8);
+        const spiralAngle = Date.now() * 0.01;
+        const spiralX = Math.cos(spiralAngle) * spiralForce * 0.3;
+        const spiralZ = Math.sin(spiralAngle) * spiralForce * 0.3;
+        
+        // Horizontal pull toward hole center with spiral
+        if (distanceToHoleCenter > 0.03) {
+          const pullForceX = ((holePos.x - ballPos.x) * 12) + spiralX;
+          const pullForceZ = ((holePos.z - ballPos.z) * 12) + spiralZ;
           this.ballBody.applyForce(new CANNON.Vec3(pullForceX, 0, pullForceZ));
         }
         
-        // Strong downward force to simulate gravity in the hole
-        this.ballBody.applyForce(new CANNON.Vec3(0, -30, 0));
+        // Gradual downward acceleration (more realistic than instant)
+        const depthFactor = Math.abs(ballY) / 0.8;
+        const downwardForce = -25 * (1 + depthFactor * 2);
+        this.ballBody.applyForce(new CANNON.Vec3(0, downwardForce, 0));
         
-        // Reduce velocity over time to simulate friction
-        this.ballBody.velocity.x *= 0.98;
-        this.ballBody.velocity.z *= 0.98;
-        this.ballBody.angularVelocity.scale(0.95);
+        // Gradual friction increase as ball goes deeper
+        const frictionFactor = 0.96 - (depthFactor * 0.1);
+        this.ballBody.velocity.x *= frictionFactor;
+        this.ballBody.velocity.z *= frictionFactor;
+        this.ballBody.angularVelocity.scale(0.92 - depthFactor * 0.05);
+        
+        // Add subtle bouncing against hole walls
+        if (distanceToHoleCenter > 0.45) {
+          const wallNormalX = (ballPos.x - holePos.x) / distanceToHoleCenter;
+          const wallNormalZ = (ballPos.z - holePos.z) / distanceToHoleCenter;
+          this.ballBody.velocity.x -= wallNormalX * 0.2;
+          this.ballBody.velocity.z -= wallNormalZ * 0.2;
+        }
       }
       
-      // Ball completion already triggered when entering hole
+      // Enhanced visual effects during fall
+      if (ballY < -0.1 && ballY > -0.7) {
+        // Create occasional dust particles as ball scrapes the hole sides
+        if (Math.random() < 0.1) {
+          this.createHoleFallParticles(ballPos.x, ballY, ballPos.z);
+        }
+      }
       
-      // Make ball invisible when it's deep enough
-      if (ballY < -1.0) {
+      // Smooth ball visibility transition
+      if (ballY < -0.6) {
         this.ball.visible = false;
-      } else if (ballY < -0.2) {
-        // Fade ball as it goes deeper
-        const fadeAmount = Math.max(0, 1 - Math.abs(ballY + 0.2) / 0.8);
-        (this.ball.material as THREE.MeshLambertMaterial).opacity = fadeAmount;
+      } else if (ballY < -0.1) {
+        // Smooth fade based on depth
+        const fadeStart = -0.1;
+        const fadeEnd = -0.6;
+        const fadeProgress = (ballY - fadeStart) / (fadeEnd - fadeStart);
+        const opacity = Math.max(0, Math.min(1, fadeProgress));
+        
+        (this.ball.material as THREE.MeshLambertMaterial).opacity = opacity;
         (this.ball.material as THREE.MeshLambertMaterial).transparent = true;
+        
+        // Slightly shrink ball as it disappears for depth effect
+        const scale = 0.7 + (opacity * 0.3);
+        this.ball.scale.set(scale, scale, scale);
       }
     }
     
@@ -1234,6 +1424,150 @@ export class GameEngine {
       this.camera.updateProjectionMatrix();
     }
     this.updateFirstPersonCamera();
+  }
+
+  private createHoleEntryEffects(x: number, z: number) {
+    // Create satisfying particle effect when ball enters hole
+    const particleCount = 8;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2;
+      const distance = 0.3 + Math.random() * 0.2;
+      const particleX = x + Math.cos(angle) * distance;
+      const particleZ = z + Math.sin(angle) * distance;
+      
+      // Create small grass particles
+      const particleGeometry = new THREE.SphereGeometry(0.02 + Math.random() * 0.01, 4, 4);
+      const particleMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x4a8c3a,
+        transparent: true,
+        opacity: 0.8
+      });
+      const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+      particle.position.set(particleX, 0.1, particleZ);
+      this.scene.add(particle);
+      
+      // Animate particle upward and fade out
+      const animateParticle = () => {
+        particle.position.y += 0.02;
+        particle.material.opacity -= 0.02;
+        particle.rotation.x += 0.1;
+        particle.rotation.z += 0.1;
+        
+        if (particle.material.opacity > 0) {
+          requestAnimationFrame(animateParticle);
+        } else {
+          this.scene.remove(particle);
+        }
+      };
+      
+      // Start animation with slight delay
+      setTimeout(() => animateParticle(), i * 50);
+    }
+
+    // Create satisfying "plop" ring effect
+    const ringGeometry = new THREE.RingGeometry(0.1, 0.4, 16);
+    const ringMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.6,
+      side: THREE.DoubleSide
+    });
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.position.set(x, 0.02, z);
+    ring.rotation.x = -Math.PI / 2;
+    this.scene.add(ring);
+    
+    // Animate ring expansion and fade
+    const animateRing = () => {
+      ring.scale.x += 0.1;
+      ring.scale.y += 0.1;
+      ring.material.opacity -= 0.05;
+      
+      if (ring.material.opacity > 0) {
+        requestAnimationFrame(animateRing);
+      } else {
+        this.scene.remove(ring);
+      }
+    };
+    animateRing();
+  }
+
+  private createRimHitEffect(x: number, z: number) {
+    // Create small spark effect when ball hits rim
+    const sparkCount = 4;
+    for (let i = 0; i < sparkCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 0.1 + Math.random() * 0.1;
+      const sparkX = x + Math.cos(angle) * distance;
+      const sparkZ = z + Math.sin(angle) * distance;
+      
+      const sparkGeometry = new THREE.SphereGeometry(0.01, 4, 4);
+      const sparkMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xffaa00,
+        transparent: true,
+        opacity: 1
+      });
+      const spark = new THREE.Mesh(sparkGeometry, sparkMaterial);
+      spark.position.set(sparkX, 0.05, sparkZ);
+      this.scene.add(spark);
+      
+      // Animate spark
+      const animateSpark = () => {
+        spark.position.y += 0.01;
+        spark.material.opacity -= 0.05;
+        spark.scale.multiplyScalar(0.95);
+        
+        if (spark.material.opacity > 0) {
+          requestAnimationFrame(animateSpark);
+        } else {
+          this.scene.remove(spark);
+        }
+      };
+      animateSpark();
+    }
+  }
+
+  private createHoleFallParticles(x: number, y: number, z: number) {
+    // Create small dust particles as ball scrapes hole sides
+    const particleCount = 2;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 0.3 + Math.random() * 0.2;
+      const particleX = x + Math.cos(angle) * distance;
+      const particleZ = z + Math.sin(angle) * distance;
+      
+      const dustGeometry = new THREE.SphereGeometry(0.005 + Math.random() * 0.005, 3, 3);
+      const dustMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x8B4513, // Brown dust color
+        transparent: true,
+        opacity: 0.6
+      });
+      const dust = new THREE.Mesh(dustGeometry, dustMaterial);
+      dust.position.set(particleX, y + 0.05, particleZ);
+      this.scene.add(dust);
+      
+      // Animate dust particle
+      const velocity = {
+        x: (Math.random() - 0.5) * 0.02,
+        y: 0.005 + Math.random() * 0.01,
+        z: (Math.random() - 0.5) * 0.02
+      };
+      
+      const animateDust = () => {
+        dust.position.x += velocity.x;
+        dust.position.y += velocity.y;
+        dust.position.z += velocity.z;
+        velocity.y -= 0.0005; // Gravity
+        dust.material.opacity -= 0.02;
+        
+        if (dust.material.opacity > 0) {
+          requestAnimationFrame(animateDust);
+        } else {
+          this.scene.remove(dust);
+        }
+      };
+      animateDust();
+    }
   }
 
   public dispose() {
