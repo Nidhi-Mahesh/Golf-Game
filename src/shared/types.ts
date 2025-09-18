@@ -13,3 +13,19 @@ import z from "zod";
  *
  * export type TodoType = z.infer<typeof TodoSchema>;
  */
+
+// Leaderboard types
+export const LeaderboardEntrySchema = z.object({
+  playerName: z.string(),
+  level: z.number(),
+  strokes: z.number(),
+  timestamp: z.number(),
+});
+
+export type LeaderboardEntry = z.infer<typeof LeaderboardEntrySchema>;
+
+export interface LevelData {
+  id: number;
+  bestScore: number | null;
+  isUnlocked: boolean;
+}
