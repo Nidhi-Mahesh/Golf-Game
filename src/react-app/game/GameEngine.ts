@@ -55,6 +55,7 @@ export class GameEngine {
   private wallBodies: CANNON.Body[] = [];
   private holeBody!: CANNON.Body;
   private flag!: THREE.Group;
+  private trees: THREE.Group[] = []; // Array to store background trees
   private holePosition = new THREE.Vector3(0, 0, -12); // Default hole position
   private currentLevel = 1;
   private onLevelComplete?: (level: number, strokes: number) => void;
@@ -236,6 +237,8 @@ export class GameEngine {
         this.setupLevel5();
         break;
     }
+    // Create background trees for the current level
+    this.createBackgroundTrees(this.currentLevel);
     // Calculate goal direction for first-person camera
     this.calculateGoalDirection();
     // Apply first-person camera after level geometry
@@ -243,9 +246,12 @@ export class GameEngine {
   }
 
   private setupLevel1() {
-    // Ground - thinner so ball sits on top
+    // Ground - thinner so ball sits on top with enhanced grass material
     const groundGeometry = new THREE.BoxGeometry(20, 0.1, 30);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
+    const groundMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x4CAF50, // More vibrant grass green
+      transparent: false
+    });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
@@ -283,7 +289,10 @@ export class GameEngine {
     // Circular ground - thinner (advanced level - was Level 2)
     const radius = 18;
     const groundGeometry = new THREE.CylinderGeometry(radius, radius, 0.1, 32);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
+    const groundMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x4CAF50, // More vibrant grass green
+      transparent: false
+    });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
@@ -348,7 +357,10 @@ export class GameEngine {
   private setupLevel2() {
     // Larger ground for level 2 - thinner (bumpy terrain - was Level 3)
     const groundGeometry = new THREE.BoxGeometry(30, 0.1, 40);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
+    const groundMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x4CAF50, // More vibrant grass green
+      transparent: false
+    });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
@@ -498,7 +510,10 @@ export class GameEngine {
     
     // Ground - main platform
     const groundGeometry = new THREE.BoxGeometry(25, 0.1, 35);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x78BC61 });
+    const groundMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x4CAF50, // More vibrant grass green
+      transparent: false
+    });
     this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
@@ -793,6 +808,242 @@ export class GameEngine {
     downSlopeBody.position.set(x, height/4, z + sectionDepth); // Lower
     downSlopeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), slopeAngle);
     this.world.addBody(downSlopeBody);
+  }
+
+  private createTree(x: number, z: number, scale: number = 1) {
+    // Create a realistic tree for golf course background
+    const tree = new THREE.Group();
+    
+    // Tree trunk - natural brown color
+    const trunkHeight = 4 * scale;
+    const trunkRadius = 0.3 * scale;
+    const trunkGeometry = new THREE.CylinderGeometry(
+      trunkRadius * 0.8, // Top radius (slightly narrower)
+      trunkRadius,       // Bottom radius
+      trunkHeight,       // Height
+      8                  // Segments
+    );
+    const trunkMaterial = new THREE.MeshLambertMaterial({ 
+      color: 0x8B4513 // Saddle brown - natural tree bark color
+    });
+    const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+    trunk.position.set(0, trunkHeight/2, 0);
+    trunk.castShadow = true;
+    trunk.receiveShadow = true;
+    tree.add(trunk);
+    
+    // Tree foliage - multiple spheres for natural look
+    const foliageColors = [
+      0x228B22, // Forest green
+      0x32CD32, // Lime green  
+      0x006400  // Dark green
+    ];
+    
+    // Create multiple foliage clusters for a more natural, full appearance
+    for (let i = 0; i < 4; i++) {
+      const foliageRadius = (1.2 + Math.random() * 0.8) * scale;
+      const foliageGeometry = new THREE.SphereGeometry(foliageRadius, 12, 8);
+      const foliageColor = foliageColors[Math.floor(Math.random() * foliageColors.length)];
+      const foliageMaterial = new THREE.MeshLambertMaterial({ 
+        color: foliageColor,
+        transparent: false
+      });
+      
+      const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+      
+      // Position foliage clusters at different heights and slight offsets
+      const offsetX = (Math.random() - 0.5) * 0.8 * scale;
+      const offsetZ = (Math.random() - 0.5) * 0.8 * scale;
+      const foliageY = trunkHeight * (0.6 + i * 0.15) + Math.random() * 0.5;
+      
+      foliage.position.set(offsetX, foliageY, offsetZ);
+      foliage.castShadow = true;
+      foliage.receiveShadow = true;
+      tree.add(foliage);
+    }
+    
+    // Position the complete tree
+    tree.position.set(x, 0, z);
+    
+    // Add slight rotation for natural variation
+    tree.rotation.y = Math.random() * Math.PI * 2;
+    
+    // Add the tree to scene and our tracking array
+    this.scene.add(tree);
+    this.trees.push(tree);
+    
+    return tree;
+  }
+
+  private createBackgroundTrees(level: number) {
+    // Clear existing trees first
+    this.trees.forEach(tree => {
+      this.scene.remove(tree);
+    });
+    this.trees = [];
+    
+    // Different tree arrangements for each level
+    switch (level) {
+      case 1:
+        this.createTreesForLevel1();
+        break;
+      case 2:
+        this.createTreesForLevel2();
+        break;
+      case 3:
+        this.createTreesForLevel3();
+        break;
+      case 4:
+        this.createTreesForLevel4();
+        break;
+      case 5:
+        this.createTreesForLevel5();
+        break;
+    }
+  }
+
+  private createTreesForLevel1() {
+    // Level 1: Rectangular course (20x30 units), place trees around perimeter
+    const courseWidth = 20;
+    const courseDepth = 30;
+    const treeDistance = 3; // Distance from course boundary
+    
+    // Trees along the back (positive Z) - increased spacing from 4 to 7
+    for (let x = -courseWidth/2 - treeDistance; x <= courseWidth/2 + treeDistance; x += 7) {
+      this.createTree(x, courseDepth/2 + treeDistance, 0.8 + Math.random() * 0.4);
+    }
+    
+    // Trees along the front (negative Z) - increased spacing from 4 to 7
+    for (let x = -courseWidth/2 - treeDistance; x <= courseWidth/2 + treeDistance; x += 7) {
+      this.createTree(x, -courseDepth/2 - treeDistance, 0.8 + Math.random() * 0.4);
+    }
+    
+    // Trees along the sides - increased spacing from 4 to 8
+    for (let z = -courseDepth/2; z <= courseDepth/2; z += 8) {
+      // Left side
+      this.createTree(-courseWidth/2 - treeDistance, z, 0.8 + Math.random() * 0.4);
+      // Right side  
+      this.createTree(courseWidth/2 + treeDistance, z, 0.8 + Math.random() * 0.4);
+    }
+    
+    // Add some scattered trees further back for depth - reduced count from 8 to 5
+    for (let i = 0; i < 5; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 18 + Math.random() * 8;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+      this.createTree(x, z, 0.6 + Math.random() * 0.8);
+    }
+  }
+
+  private createTreesForLevel2() {
+    // Level 2: Larger course (30x40), bumpy terrain
+    const courseWidth = 30;
+    const courseDepth = 40;
+    const treeDistance = 4;
+    
+    // Tree line around perimeter - increased spacing from 3.5 to 6
+    for (let x = -courseWidth/2 - treeDistance; x <= courseWidth/2 + treeDistance; x += 6) {
+      this.createTree(x, courseDepth/2 + treeDistance, 0.9 + Math.random() * 0.6);
+      this.createTree(x, -courseDepth/2 - treeDistance, 0.9 + Math.random() * 0.6);
+    }
+    
+    for (let z = -courseDepth/2; z <= courseDepth/2; z += 6) {
+      this.createTree(-courseWidth/2 - treeDistance, z, 0.9 + Math.random() * 0.6);
+      this.createTree(courseWidth/2 + treeDistance, z, 0.9 + Math.random() * 0.6);
+    }
+    
+    // Scattered background trees - reduced count from 12 to 8
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 25 + Math.random() * 12;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+      this.createTree(x, z, 0.7 + Math.random() * 0.8);
+    }
+  }
+
+  private createTreesForLevel3() {
+    // Level 3: Multi-layer platforms - place trees around the large ground area
+    const groundSize = 50;
+    const treeDistance = 5;
+    
+    // Create a forest around the platform area - increased spacing from 4 to 8
+    for (let x = -groundSize/2 - treeDistance; x <= groundSize/2 + treeDistance; x += 8) {
+      for (let z = -groundSize/2 - treeDistance; z <= groundSize/2 + treeDistance; z += 8) {
+        // Skip the center area where the platforms are
+        const distanceFromCenter = Math.sqrt(x*x + z*z);
+        if (distanceFromCenter > 20) {
+          // Add some randomness to tree placement - reduced probability from 0.3 to 0.5
+          if (Math.random() > 0.5) {
+            this.createTree(
+              x + (Math.random() - 0.5) * 3,
+              z + (Math.random() - 0.5) * 3,
+              0.8 + Math.random() * 0.7
+            );
+          }
+        }
+      }
+    }
+  }
+
+  private createTreesForLevel4() {
+    // Level 4: Ground level with moving blocks (25x35)
+    const courseWidth = 25;
+    const courseDepth = 35;
+    const treeDistance = 3.5;
+    
+    // Perimeter trees - increased spacing from 3 to 6
+    for (let x = -courseWidth/2 - treeDistance; x <= courseWidth/2 + treeDistance; x += 6) {
+      this.createTree(x, courseDepth/2 + treeDistance, 0.8 + Math.random() * 0.5);
+      this.createTree(x, -courseDepth/2 - treeDistance, 0.8 + Math.random() * 0.5);
+    }
+    
+    for (let z = -courseDepth/2; z <= courseDepth/2; z += 7) {
+      this.createTree(-courseWidth/2 - treeDistance, z, 0.8 + Math.random() * 0.5);
+      this.createTree(courseWidth/2 + treeDistance, z, 0.8 + Math.random() * 0.5);
+    }
+    
+    // Background forest - reduced count from 10 to 6
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 22 + Math.random() * 10;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+      this.createTree(x, z, 0.6 + Math.random() * 0.9);
+    }
+  }
+
+  private createTreesForLevel5() {
+    // Level 5: Circular course (radius 18)
+    const courseRadius = 18;
+    const treeDistance = 4;
+    
+    // Create concentric rings of trees around the circular course
+    // Inner ring - increased spacing from 0.3 to 0.8
+    const innerRadius = courseRadius + treeDistance;
+    for (let angle = 0; angle < Math.PI * 2; angle += 0.8) {
+      const x = Math.cos(angle) * innerRadius;
+      const z = Math.sin(angle) * innerRadius;
+      this.createTree(x, z, 0.8 + Math.random() * 0.4);
+    }
+    
+    // Outer ring - increased spacing from 0.4 to 0.9
+    const outerRadius = courseRadius + treeDistance * 2.5;
+    for (let angle = 0; angle < Math.PI * 2; angle += 0.9) {
+      const x = Math.cos(angle) * outerRadius;
+      const z = Math.sin(angle) * outerRadius;
+      this.createTree(x, z, 0.9 + Math.random() * 0.6);
+    }
+    
+    // Very distant trees for depth - reduced count from 15 to 10
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 35 + Math.random() * 15;
+      const x = Math.cos(angle) * distance;
+      const z = Math.sin(angle) * distance;
+      this.createTree(x, z, 0.5 + Math.random() * 1.0);
+    }
   }
 
 
@@ -1748,6 +1999,12 @@ export class GameEngine {
       this.world.removeBody(block.body);
     });
     this.movingBlocks = [];
+    
+    // Clean up trees
+    this.trees.forEach(tree => {
+      this.scene.remove(tree);
+    });
+    this.trees = [];
     
     // Clean up other resources
   }

@@ -154,7 +154,7 @@ export default function Game() {
   const goToLevels = () => navigate('/levels');
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-sky-400 via-sky-500 to-blue-600">
+    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-green-300 via-green-400 to-green-600">
       {/* Game Canvas */}
       <canvas 
         ref={canvasRef}
