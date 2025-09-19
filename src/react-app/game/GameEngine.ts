@@ -559,6 +559,13 @@ export class GameEngine {
     
     // Barrier 3: Right side patrol - covers right approach
     this.createWoodenBarrier(8, 0.4, -6, 4, 0.8, 1.5, new THREE.Vector3(1, 0, 0), 2.3, 6); // Faster, stays within right side
+    
+    // NEW BARRIERS - Add more moving obstacles (horizontal only)
+    // Barrier 4: Mid-course horizontal sweeper
+    this.createWoodenBarrier(0, 0.4, -4, 8, 0.8, 1.5, new THREE.Vector3(1, 0, 0), 1.8, 12); // Slow but wide coverage
+    
+    // Barrier 5: Final approach guardian - near hole
+    this.createWoodenBarrier(0, 0.4, -10, 5, 0.8, 1.2, new THREE.Vector3(1, 0, 0), 3.0, 8); // Fast final challenge
 
     this.createHole(0, -14);
   }
@@ -706,11 +713,12 @@ export class GameEngine {
 
     // Physics barrier - solid and bouncy like real wood
     const barrierShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
-    const barrierBody = new CANNON.Body({ mass: 0 }); // Kinematic body
+    const barrierBody = new CANNON.Body({ mass: 0 }); // Static body that we'll move manually
     barrierBody.material = this.movingBlockMaterial;
     barrierBody.addShape(barrierShape);
     barrierBody.position.set(x, y, z);
-    barrierBody.type = CANNON.Body.KINEMATIC;
+    barrierBody.type = CANNON.Body.STATIC; // Use STATIC instead of KINEMATIC for better collision
+    barrierBody.updateBoundingRadius(); // Ensure collision bounds are calculated
     this.world.addBody(barrierBody);
     this.wallBodies.push(barrierBody);
 
@@ -744,8 +752,11 @@ export class GameEngine {
       // Update visual mesh position
       block.mesh.position.copy(newPos);
       
-      // Update physics body position
+      // Update physics body position - CRITICAL: Remove and re-add to world for proper collision
+      this.world.removeBody(block.body);
       block.body.position.set(newPos.x, newPos.y, newPos.z);
+      block.body.updateBoundingRadius(); // Recalculate collision bounds
+      this.world.addBody(block.body);
       
       // No rotation for wooden barriers - keep them stable and realistic
       // Wooden barriers should look solid and predictable
@@ -1416,8 +1427,8 @@ export class GameEngine {
       // Create dotted trail with varying sizes - more realistic trajectory
       const points = [];
       const ballPos = this.ball.position.clone();
-      const power = Math.min(aimDistance * 35 * 1.5, 35);
-      const trailLength = Math.min(power * 1.5, 25);
+      const power = Math.min(aimDistance * 80 * 3.0, 80); // Match new power calculation
+      const trailLength = Math.min(power * 2.0, 60); // Longer trail for higher power
       
       // Create multiple segments for dotted effect
       const segments = 15;
@@ -1505,8 +1516,8 @@ export class GameEngine {
     
     if (aimDistance > 0.05) { // Minimum drag distance
       // Calculate power based on drag distance
-      const maxPower = 35; // Much higher maximum shot power
-      const power = Math.min(aimDistance * maxPower * 1.5, maxPower);
+      const maxPower = 80; // SUPER high maximum shot power
+      const power = Math.min(aimDistance * maxPower * 3.0, maxPower); // 3x multiplier for explosive power
       
       // Get ball position in screen space
       const ballScreenPos = new THREE.Vector3();
