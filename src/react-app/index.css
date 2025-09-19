@@ -78,3 +78,103 @@
     animation: glow 1s ease-in-out;
   }
 }
+
+/* New animations for enhanced landing page - DISABLED FOR SIMPLICITY */
+/*
+@keyframes background-parallax {
+  0% {
+    transform: scale(1) translateY(0px);
+  }
+  50% {
+    transform: scale(1.05) translateY(-5px);
+  }
+  100% {
+    transform: scale(1) translateY(0px);
+  }
+}
+
+@keyframes text-glow {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5),
+                 0 0 20px rgba(255, 255, 255, 0.3),
+                 0 0 30px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.8),
+                 0 0 25px rgba(255, 255, 255, 0.5),
+                 0 0 35px rgba(16, 185, 129, 0.4);
+  }
+}
+
+@keyframes card-entrance {
+  0% {
+    opacity: 0;
+    transform: translateY(30px) rotateY(-10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0px) rotateY(0deg);
+  }
+}
+
+@keyframes button-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes floating-elements {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+    opacity: 0.7;
+  }
+  33% {
+    transform: translateY(-15px) rotate(120deg);
+    opacity: 1;
+  }
+  66% {
+    transform: translateY(-5px) rotate(240deg);
+    opacity: 0.8;
+  }
+}
+
+/* Animation classes */
+/*.background-parallax {
+  animation: background-parallax 20s ease-in-out infinite;
+}
+
+.text-glow-animation {
+  animation: text-glow 3s ease-in-out infinite;
+}
+
+.card-entrance {
+  animation: card-entrance 0.8s ease-out forwards;
+}
+
+.button-pulse {
+  animation: button-pulse 2s ease-in-out infinite;
+}
+
+.floating-elements {
+  animation: floating-elements 8s ease-in-out infinite;
+}*/
+
+/* Enhanced glassmorphism - keeping these as they're useful */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+.glass-effect-strong {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.5);
+}
