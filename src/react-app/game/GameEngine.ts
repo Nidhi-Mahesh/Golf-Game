@@ -374,172 +374,122 @@ export class GameEngine {
   }
 
   private setupLevel3() {
-    // Curved slide course: a curving track with continuous side walls (was Level 4)
-    const segments = 72; // More segments for smoother curve
-    const trackWidth = 7; // playable width
-    const wallHeight = 3.5;
-    const wallThickness = 0.8;
-    const startZ = 12;
-    const endZ = -20;
-    const totalLength = startZ - endZ; // positive
-
-    // Parametric centerline: gentle S-curve
-    const centerAt = (t: number) => {
-      const z = startZ - t * totalLength;
-      const x = 5 * Math.sin(t * Math.PI * 0.8); // curve left-right
-      return new THREE.Vector3(x, 0, z);
-    };
-
-    const up = new THREE.Vector3(0, 1, 0);
-    let endPoint = centerAt(1);
-
-    // Create smooth surface using more segments but keep it simple
-    for (let i = 0; i < segments; i++) {
-      const t0 = i / segments;
-      const t1 = (i + 1) / segments;
-      const p0 = centerAt(t0);
-      const p1 = centerAt(t1);
-      const segmentCenter = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
-      const dir = new THREE.Vector3().subVectors(p1, p0);
-      const segLen = dir.length();
-      if (segLen === 0) continue;
-      dir.normalize();
-      const yaw = Math.atan2(dir.x, dir.z);
-
-      // Slight downhill tilt to keep momentum
-      // Use a flat launch pad for first few segments so the ball doesn't roll instantly
-      const baseSlope = -Math.PI / 40; // ~4.5 degrees
-      const slope = i < 6 ? 0 : baseSlope;
-
-      // Floor piece (visual) - make it thinner for smoother appearance
-      const floorGeom = new THREE.BoxGeometry(trackWidth, 0.2, segLen * 0.9); // Slightly smaller segments to reduce gaps
-      const floorMat = new THREE.MeshLambertMaterial({ color: 0x6fbf73 });
-      const floor = new THREE.Mesh(floorGeom, floorMat);
-      floor.position.set(segmentCenter.x, 0, segmentCenter.z);
-      floor.rotation.y = yaw;
-      floor.rotation.x = slope;
-      floor.receiveShadow = true;
-      this.scene.add(floor);
-
-      // Floor physics - thinner for better ball contact
-      const floorShape = new CANNON.Box(new CANNON.Vec3(trackWidth / 2, 0.05, segLen / 2));
-      const floorBody = new CANNON.Body({ mass: 0 });
-      floorBody.material = new CANNON.Material('ground');
-      floorBody.addShape(floorShape);
-      floorBody.position.set(segmentCenter.x, 0, segmentCenter.z);
-      floorBody.quaternion.setFromEuler(slope, yaw, 0, 'XYZ');
-      this.world.addBody(floorBody);
-
-      // Side walls (left and right)
-      const right = new THREE.Vector3().crossVectors(dir, up).normalize();
-      const leftOffset = right.clone().multiplyScalar(-trackWidth / 2 - wallThickness / 2);
-      const rightOffset = right.clone().multiplyScalar(trackWidth / 2 + wallThickness / 2);
-
-      const placeWall = (offset: THREE.Vector3) => {
-        const wallGeom = new THREE.BoxGeometry(wallThickness, wallHeight, segLen);
-        const wallMat = new THREE.MeshLambertMaterial({ 
-          color: 0xD2B48C,
-          transparent: true,
-          opacity: 0.7 // 70% opacity, 30% transparent
-        });
-        const wall = new THREE.Mesh(wallGeom, wallMat);
-        wall.position.copy(segmentCenter.clone().add(offset));
-        wall.rotation.y = yaw;
-        wall.rotation.x = slope;
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        this.scene.add(wall);
-        this.walls.push(wall);
-
-        const wallShape = new CANNON.Box(new CANNON.Vec3(wallThickness / 2, wallHeight / 2, segLen / 2));
-        const wallBody = new CANNON.Body({ mass: 0 });
-        wallBody.material = new CANNON.Material('bouncyWall'); // Use super bouncy material for Level 4
-        wallBody.addShape(wallShape);
-        wallBody.position.set(wall.position.x, wall.position.y + wallHeight / 2 - 0.2, wall.position.z);
-        wallBody.quaternion.setFromEuler(slope, yaw, 0, 'XYZ');
-        wallBody.type = CANNON.Body.KINEMATIC;
-        this.world.addBody(wallBody);
-        this.wallBodies.push(wallBody);
-      };
-
-      placeWall(leftOffset);
-      placeWall(rightOffset);
-
-      if (i === segments - 1) {
-        endPoint = p1.clone();
-      }
-    }
-
-    // Place hole at the end of the slide centerline
-    this.createHole(endPoint.x, endPoint.z + 1);
-
-    // Place oriented catch wall aligned with final direction and slope
-    const baseSlope = -Math.PI / 40;
-    const endPrev = centerAt(1 - 1 / segments);
-    const endDir = new THREE.Vector3().subVectors(endPoint, endPrev).normalize();
-    const endYaw = Math.atan2(endDir.x, endDir.z);
-    const catchCenter = endPoint.clone().add(endDir.clone().multiplyScalar(0.6));
-    this.createRotatedWall(catchCenter.x, 2, catchCenter.z, trackWidth + 2, 4, 1, endYaw, baseSlope, 0xD2B48C);
-
-    // Start ball near the start of the slide
-    const startPoint = centerAt(0);
-    // Compute local downhill direction and orientation at start
-    const nextPoint = centerAt(1 / segments);
-    const startDir = new THREE.Vector3().subVectors(nextPoint, startPoint).normalize();
-    const startYaw = Math.atan2(startDir.x, startDir.z);
-    const startSlope = 0; // first segments are flat
-
-    // Place ball in a very safe starting position on the track
-    // Use a simple, guaranteed safe position at the start of the slide
-    this.ballStartPos = new THREE.Vector3(0, 1.0, 12); // Center of track, well above surface, at starting Z position
-
-    // Starter lip removed to prevent blocking ball movement
-
-    // Backstop behind the ball to prevent any backward drift
-    const backLipDepth = 0.6;
-    const backLipHeight = 0.5;
-    const lipMat = new THREE.MeshLambertMaterial({ color: 0xC9A671 });
-    const backLipGeom = new THREE.BoxGeometry(trackWidth * 0.5, backLipHeight, backLipDepth);
-    const backLip = new THREE.Mesh(backLipGeom, lipMat);
-    const backLipOffset = startDir.clone().multiplyScalar(-0.5);
-    backLip.position.set(this.ballStartPos.x + backLipOffset.x, backLipHeight / 2 - 0.05, this.ballStartPos.z + backLipOffset.z);
-    backLip.rotation.y = startYaw;
-    backLip.castShadow = true;
-    backLip.receiveShadow = true;
-    this.scene.add(backLip);
-
-    const backLipShape = new CANNON.Box(new CANNON.Vec3((trackWidth * 0.5) / 2, backLipHeight / 2, backLipDepth / 2));
-    const backLipBody = new CANNON.Body({ mass: 0 });
-    backLipBody.material = new CANNON.Material('ground');
-    backLipBody.addShape(backLipShape);
-    backLipBody.position.set(backLip.position.x, backLip.position.y, backLip.position.z);
-    backLipBody.quaternion.setFromEuler(0, startYaw, 0, 'XYZ');
-    backLipBody.type = CANNON.Body.KINEMATIC;
-    this.world.addBody(backLipBody);
-
-    // Small side nubs near the start to further cradle the ball
-    const nubDepth = 0.6;
-    const nubHeight = 0.4;
-    const nubWidth = 0.6;
-    const right = new THREE.Vector3().crossVectors(startDir, new THREE.Vector3(0,1,0)).normalize();
-    const placeNub = (side: number) => {
-      const nub = new THREE.Mesh(new THREE.BoxGeometry(nubWidth, nubHeight, nubDepth), lipMat);
-      const lateralOffset = right.clone().multiplyScalar(side * (trackWidth/2 - 0.5));
-      const forwardOffset = startDir.clone().multiplyScalar(0.1);
-      nub.position.set(this.ballStartPos.x + lateralOffset.x + forwardOffset.x, nubHeight/2 - 0.05, this.ballStartPos.z + lateralOffset.z + forwardOffset.z);
-      nub.rotation.y = startYaw;
-      this.scene.add(nub);
-      const nubShape = new CANNON.Box(new CANNON.Vec3(nubWidth/2, nubHeight/2, nubDepth/2));
-      const nubBody = new CANNON.Body({ mass: 0 });
-      nubBody.material = new CANNON.Material('ground');
-      nubBody.addShape(nubShape);
-      nubBody.position.set(nub.position.x, nub.position.y, nub.position.z);
-      nubBody.quaternion.setFromEuler(0, startYaw, 0, 'XYZ');
-      nubBody.type = CANNON.Body.KINEMATIC;
-      this.world.addBody(nubBody);
-    };
-    placeNub(1);
-    placeNub(-1);
+    // Multi-layer jumping course - disconnected platforms at different heights
+    const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB }); // Sky blue platforms
+    const platformSize = 8;
+    const platformThickness = 1.0; // Thicker platforms to prevent pass-through
+    
+    // Layer 1 (Top) - Starting platform
+    const layer1Height = 8;
+    const layer1Platform = new THREE.BoxGeometry(platformSize, platformThickness, platformSize);
+    const layer1Mesh = new THREE.Mesh(layer1Platform, platformMaterial);
+    layer1Mesh.position.set(0, layer1Height, 0);
+    layer1Mesh.castShadow = true;
+    layer1Mesh.receiveShadow = true;
+    this.scene.add(layer1Mesh);
+    
+    // Layer 1 physics
+    const layer1Shape = new CANNON.Box(new CANNON.Vec3(platformSize / 2, platformThickness / 2, platformSize / 2));
+    const layer1Body = new CANNON.Body({ mass: 0 });
+    layer1Body.material = new CANNON.Material('ground');
+    layer1Body.addShape(layer1Shape);
+    layer1Body.position.set(0, layer1Height, 0);
+    this.world.addBody(layer1Body);
+    
+    // Layer 2 (Middle) - Disconnected from layer 1
+    const layer2Height = 6; // Raised higher to make more challenging
+    const layer2X = 12; // Offset to the right
+    const layer2Z = -8; // Offset backward
+    const layer2Platform = new THREE.BoxGeometry(platformSize, platformThickness, platformSize);
+    const layer2Mesh = new THREE.Mesh(layer2Platform, platformMaterial);
+    layer2Mesh.position.set(layer2X, layer2Height, layer2Z);
+    layer2Mesh.castShadow = true;
+    layer2Mesh.receiveShadow = true;
+    this.scene.add(layer2Mesh);
+    
+    // Layer 2 physics
+    const layer2Shape = new CANNON.Box(new CANNON.Vec3(platformSize / 2, platformThickness / 2, platformSize / 2));
+    const layer2Body = new CANNON.Body({ mass: 0 });
+    layer2Body.material = new CANNON.Material('ground');
+    layer2Body.addShape(layer2Shape);
+    layer2Body.position.set(layer2X, layer2Height, layer2Z);
+    this.world.addBody(layer2Body);
+    
+    // Layer 3 (Bottom) - Final platform with hole - Disconnected from layer 2
+    const layer3Height = 1;
+    const layer3X = -10; // Offset to the left
+    const layer3Z = 10; // Offset forward
+    const layer3Platform = new THREE.BoxGeometry(platformSize + 2, platformThickness, platformSize + 2);
+    const finalPlatformMaterial = new THREE.MeshLambertMaterial({ color: 0x6fbf73 }); // Green for final platform
+    const layer3Mesh = new THREE.Mesh(layer3Platform, finalPlatformMaterial);
+    layer3Mesh.position.set(layer3X, layer3Height, layer3Z);
+    layer3Mesh.castShadow = true;
+    layer3Mesh.receiveShadow = true;
+    this.scene.add(layer3Mesh);
+    
+    // Layer 3 physics
+    const layer3Shape = new CANNON.Box(new CANNON.Vec3((platformSize + 2) / 2, platformThickness / 2, (platformSize + 2) / 2));
+    const layer3Body = new CANNON.Body({ mass: 0 });
+    layer3Body.material = new CANNON.Material('ground');
+    layer3Body.addShape(layer3Shape);
+    layer3Body.position.set(layer3X, layer3Height, layer3Z);
+    this.world.addBody(layer3Body);
+    
+    // Add some smaller intermediate jumping platforms for extra challenge
+    // Small platform 1 - between layer 1 and 2
+    const smallPlatform1 = new THREE.BoxGeometry(4, platformThickness, 4);
+    const smallPlatform1Material = new THREE.MeshLambertMaterial({ color: 0xFFD700 }); // Gold
+    const small1Mesh = new THREE.Mesh(smallPlatform1, smallPlatform1Material);
+    small1Mesh.position.set(6, 7, -4); // Adjusted height for new layer 2 height
+    small1Mesh.castShadow = true;
+    small1Mesh.receiveShadow = true;
+    this.scene.add(small1Mesh);
+    
+    // Small platform 1 physics
+    const small1Shape = new CANNON.Box(new CANNON.Vec3(2, platformThickness / 2, 2));
+    const small1Body = new CANNON.Body({ mass: 0 });
+    small1Body.material = new CANNON.Material('ground');
+    small1Body.addShape(small1Shape);
+    small1Body.position.set(6, 7, -4);
+    this.world.addBody(small1Body);
+    
+    // Small platform 2 - between layer 2 and 3
+    const smallPlatform2 = new THREE.BoxGeometry(4, platformThickness, 4);
+    const small2Mesh = new THREE.Mesh(smallPlatform2, smallPlatform1Material);
+    small2Mesh.position.set(2, 3.5, 2); // Adjusted height between layer 2 (6) and layer 3 (1)
+    small2Mesh.castShadow = true;
+    small2Mesh.receiveShadow = true;
+    this.scene.add(small2Mesh);
+    
+    // Small platform 2 physics
+    const small2Shape = new CANNON.Box(new CANNON.Vec3(2, platformThickness / 2, 2));
+    const small2Body = new CANNON.Body({ mass: 0 });
+    small2Body.material = new CANNON.Material('ground');
+    small2Body.addShape(small2Shape);
+    small2Body.position.set(2, 3.5, 2);
+    this.world.addBody(small2Body);
+    
+    // Main ground platform at the very bottom for safety
+    const groundGeom = new THREE.BoxGeometry(50, 0.5, 50);
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown ground
+    this.ground = new THREE.Mesh(groundGeom, groundMaterial);
+    this.ground.position.set(0, -2, 0);
+    this.ground.receiveShadow = true;
+    this.scene.add(this.ground);
+    
+    // Ground physics
+    const groundShape = new CANNON.Box(new CANNON.Vec3(25, 0.25, 25));
+    const groundBody = new CANNON.Body({ mass: 0 });
+    groundBody.material = new CANNON.Material('ground');
+    groundBody.addShape(groundShape);
+    groundBody.position.set(0, -2, 0);
+    this.world.addBody(groundBody);
+    
+    // Ball starting position - securely on layer 1 (top platform)
+    this.ballStartPos = new THREE.Vector3(0, layer1Height + platformThickness/2 + 0.3, 0);
+    
+    // Hole on the final platform (layer 3)
+    this.createHole(layer3X, layer3Z);
   }
 
   private setupLevel4() {
@@ -634,6 +584,62 @@ export class GameEngine {
     rampBody.type = CANNON.Body.KINEMATIC;
     this.world.addBody(rampBody);
     this.wallBodies.push(rampBody);
+  }
+
+  private createSlideBoundaryWall(xOffset: number, wallHeight: number, wallThickness: number, slideLength: number, slideHeight: number, slideAngle: number, material: THREE.MeshLambertMaterial, side: string) {
+    // Create boundary wall segments that follow the slide slope
+    const segments = 10;
+    const segmentLength = slideLength / segments;
+    
+    for (let i = 0; i < segments; i++) {
+      const progress = i / segments;
+      const zPos = slideLength/2 - progress * slideLength - segmentLength/2;
+      const yPos = slideHeight * (1 - progress) + wallHeight/2;
+      
+      // Create wall segment
+      const wallGeom = new THREE.BoxGeometry(wallThickness, wallHeight, segmentLength);
+      const wall = new THREE.Mesh(wallGeom, material);
+      wall.position.set(xOffset, yPos, zPos);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      this.scene.add(wall);
+      
+      // Create physics for wall segment
+      const wallShape = new CANNON.Box(new CANNON.Vec3(wallThickness/2, wallHeight/2, segmentLength/2));
+      const wallBody = new CANNON.Body({ mass: 0 });
+      wallBody.material = new CANNON.Material('wall');
+      wallBody.addShape(wallShape);
+      wallBody.position.set(xOffset, yPos, zPos);
+      this.world.addBody(wallBody);
+    }
+  }
+
+  private createHorizontalSlideBoundaryWall(xCenter: number, zOffset: number, wallHeight: number, wallThickness: number, slideLength: number, slideHeight: number, slideAngle: number, material: THREE.MeshLambertMaterial, side: string) {
+    // Create boundary wall segments for horizontal slide
+    const segments = 10;
+    const segmentLength = slideLength / segments;
+    
+    for (let i = 0; i < segments; i++) {
+      const progress = i / segments;
+      const xPos = progress * slideLength - slideLength/2 + segmentLength/2;
+      const yPos = -slideHeight * progress + wallHeight/2;
+      
+      // Create wall segment
+      const wallGeom = new THREE.BoxGeometry(segmentLength, wallHeight, wallThickness);
+      const wall = new THREE.Mesh(wallGeom, material);
+      wall.position.set(xCenter + xPos, yPos, zOffset);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      this.scene.add(wall);
+      
+      // Create physics for wall segment
+      const wallShape = new CANNON.Box(new CANNON.Vec3(segmentLength/2, wallHeight/2, wallThickness/2));
+      const wallBody = new CANNON.Body({ mass: 0 });
+      wallBody.material = new CANNON.Material('wall');
+      wallBody.addShape(wallShape);
+      wallBody.position.set(xCenter + xPos, yPos, zOffset);
+      this.world.addBody(wallBody);
+    }
   }
 
   private createWoodenBarrier(x: number, y: number, z: number, width: number, height: number, depth: number, direction: THREE.Vector3, speed: number, range: number) {
@@ -872,11 +878,11 @@ export class GameEngine {
       const rimX = x + Math.cos(angle) * (radius + 0.03);
       const rimZ = z + Math.sin(angle) * (radius + 0.03);
       
-      const rimCollisionShape = new CANNON.Box(new CANNON.Vec3(0.02, 0.02, 0.02));
+      const rimCollisionShape = new CANNON.Box(new CANNON.Vec3(0.02, 0.005, 0.02)); // Much smaller height
       const rimCollisionBody = new CANNON.Body({ mass: 0 });
       rimCollisionBody.material = new CANNON.Material('rim');
       rimCollisionBody.addShape(rimCollisionShape);
-      rimCollisionBody.position.set(rimX, 0.02, rimZ);
+      rimCollisionBody.position.set(rimX, 0.005, rimZ); // At ground level
       this.world.addBody(rimCollisionBody);
 
       // Add contact material for rim interaction
@@ -890,9 +896,10 @@ export class GameEngine {
           frictionEquationRelaxation: 3
         }
       );
-      this.world.addContactMaterial(ballRimContact);
+    this.world.addContactMaterial(ballRimContact);
     }
   }
+
 
   private createFlag(x: number, z: number) {
     this.flag = new THREE.Group();
@@ -904,14 +911,20 @@ export class GameEngine {
     pole.position.set(0, 1.75, 0);
     this.flag.add(pole);
 
-    // Flag (bigger and bright red)
-    const flagGeometry = new THREE.PlaneGeometry(0.8, 0.6);
+    // Flag (simple triangular pennant like |> )
+    const flagShape = new THREE.Shape();
+    flagShape.moveTo(0, 0);     // Left side (top of triangle, attached to pole)
+    flagShape.lineTo(0.8, 0.3); // Right point (tip of triangle)
+    flagShape.lineTo(0, 0.6);   // Left side (bottom of triangle, attached to pole)
+    flagShape.lineTo(0, 0);     // Back to start (complete triangle)
+    
+    const flagGeometry = new THREE.ShapeGeometry(flagShape);
     const flagMaterial = new THREE.MeshLambertMaterial({ 
       color: 0xFF2222,
       side: THREE.DoubleSide 
     });
     const flagMesh = new THREE.Mesh(flagGeometry, flagMaterial);
-    flagMesh.position.set(0.4, 3.2, 0);
+    flagMesh.position.set(0.0, 3.2, 0); // Position at top of pole (pole height 3.5, centered at 1.75, so top is at 3.5)
     this.flag.add(flagMesh);
 
     // Position flag next to hole
@@ -925,8 +938,8 @@ export class GameEngine {
   private animateFlag(flagMesh: THREE.Mesh) {
     const animate = () => {
       const time = Date.now() * 0.002;
-      flagMesh.rotation.y = Math.sin(time) * 0.1;
-      flagMesh.position.x = 0.2 + Math.sin(time * 1.5) * 0.02;
+      flagMesh.rotation.y = Math.sin(time) * 0.1; // Gentle waving motion
+      flagMesh.position.x = Math.sin(time * 1.5) * 0.02; // Very small movement, stays attached to pole
       requestAnimationFrame(animate);
     };
     animate();
