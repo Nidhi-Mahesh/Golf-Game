@@ -84,8 +84,8 @@ export class GameEngine {
   private setupScene() {
     // Scene
     this.scene = new THREE.Scene();
-    // Make background transparent so page gradient shows through
-    this.scene.background = null as any;
+    // Set light blue sky background behind trees
+    this.scene.background = new THREE.Color(0x87CEEB); // Sky blue color
 
     // Camera - First Person setup
     const preset = this.getFirstPersonPreset(this.currentLevel);
@@ -128,6 +128,7 @@ export class GameEngine {
     const ballMaterial = new CANNON.Material('ball');
     const groundMaterial = new CANNON.Material('ground');
     const wallMaterial = new CANNON.Material('wall');
+    const obstacleWallMaterial = new CANNON.Material('obstacleWall'); // Dedicated obstacle material
     const bouncyWallMaterial = new CANNON.Material('bouncyWall'); // Super bouncy walls for Level 3
     this.movingBlockMaterial = new CANNON.Material('movingBlock'); // Moving blocks for Level 4
     
@@ -136,7 +137,7 @@ export class GameEngine {
       groundMaterial,
       {
         friction: 0.1, // Reduced friction as requested
-        restitution: 0.2,
+        restitution: 0.4, // Increased ground bounce for obstacles
         frictionEquationStiffness: 1e7, // Reduced for stability
         frictionEquationRelaxation: 4,
         contactEquationStiffness: 1e8,
@@ -149,7 +150,7 @@ export class GameEngine {
       wallMaterial,
       {
         friction: 0.2,
-        restitution: 0.8, // Very bouncy walls
+        restitution: 1.0, // Maximum bounce - 100% energy return
         frictionEquationStiffness: 1e10,
         frictionEquationRelaxation: 3
       }
@@ -162,6 +163,20 @@ export class GameEngine {
       {
         friction: 0.1, // Low friction for more sliding
         restitution: 1.2, // Super bouncy - more than 100% energy return!
+        frictionEquationStiffness: 1e10,
+        frictionEquationRelaxation: 3,
+        contactEquationStiffness: 1e10,
+        contactEquationRelaxation: 3
+      }
+    );
+    
+    // Obstacle walls - super bouncy for all level obstacles
+    const ballObstacleWallContact = new CANNON.ContactMaterial(
+      ballMaterial,
+      obstacleWallMaterial,
+      {
+        friction: 0.2,
+        restitution: 1.1, // 110% energy return - very bouncy obstacles
         frictionEquationStiffness: 1e10,
         frictionEquationRelaxation: 3,
         contactEquationStiffness: 1e10,
@@ -185,6 +200,7 @@ export class GameEngine {
     
     this.world.addContactMaterial(ballGroundContact);
     this.world.addContactMaterial(ballWallContact);
+    this.world.addContactMaterial(ballObstacleWallContact);
     this.world.addContactMaterial(ballBouncyWallContact);
     this.world.addContactMaterial(ballMovingBlockContact);
   }
@@ -331,7 +347,7 @@ export class GameEngine {
       const wallMaterial = new THREE.MeshLambertMaterial({ 
         color: color,
         transparent: true,
-        opacity: 0.7 // 70% opacity, 30% transparent
+        opacity: 0.9 // 90% opacity, 10% transparent
       });
       const wall = new THREE.Mesh(wallGeometry, wallMaterial);
       wall.position.set(wallX, y - 0.25, wallZ); // Lower by 0.25 to merge with ground
@@ -400,10 +416,10 @@ export class GameEngine {
     layer1Mesh.receiveShadow = true;
     this.scene.add(layer1Mesh);
     
-    // Layer 1 physics
+    // Layer 1 physics - use wall material for bounce
     const layer1Shape = new CANNON.Box(new CANNON.Vec3(platformSize / 2, platformThickness / 2, platformSize / 2));
     const layer1Body = new CANNON.Body({ mass: 0 });
-    layer1Body.material = new CANNON.Material('ground');
+    layer1Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
     layer1Body.addShape(layer1Shape);
     layer1Body.position.set(0, layer1Height, 0);
     this.world.addBody(layer1Body);
@@ -419,10 +435,10 @@ export class GameEngine {
     layer2Mesh.receiveShadow = true;
     this.scene.add(layer2Mesh);
     
-    // Layer 2 physics
+    // Layer 2 physics - use wall material for bounce
     const layer2Shape = new CANNON.Box(new CANNON.Vec3(platformSize / 2, platformThickness / 2, platformSize / 2));
     const layer2Body = new CANNON.Body({ mass: 0 });
-    layer2Body.material = new CANNON.Material('ground');
+    layer2Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
     layer2Body.addShape(layer2Shape);
     layer2Body.position.set(layer2X, layer2Height, layer2Z);
     this.world.addBody(layer2Body);
@@ -439,10 +455,10 @@ export class GameEngine {
     layer3Mesh.receiveShadow = true;
     this.scene.add(layer3Mesh);
     
-    // Layer 3 physics
+    // Layer 3 physics - use wall material for bounce
     const layer3Shape = new CANNON.Box(new CANNON.Vec3((platformSize + 2) / 2, platformThickness / 2, (platformSize + 2) / 2));
     const layer3Body = new CANNON.Body({ mass: 0 });
-    layer3Body.material = new CANNON.Material('ground');
+    layer3Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
     layer3Body.addShape(layer3Shape);
     layer3Body.position.set(layer3X, layer3Height, layer3Z);
     this.world.addBody(layer3Body);
@@ -457,10 +473,10 @@ export class GameEngine {
     small1Mesh.receiveShadow = true;
     this.scene.add(small1Mesh);
     
-    // Small platform 1 physics
+    // Small platform 1 physics - use wall material for bounce
     const small1Shape = new CANNON.Box(new CANNON.Vec3(2, platformThickness / 2, 2));
     const small1Body = new CANNON.Body({ mass: 0 });
-    small1Body.material = new CANNON.Material('ground');
+    small1Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
     small1Body.addShape(small1Shape);
     small1Body.position.set(6, 7, -4);
     this.world.addBody(small1Body);
@@ -473,10 +489,10 @@ export class GameEngine {
     small2Mesh.receiveShadow = true;
     this.scene.add(small2Mesh);
     
-    // Small platform 2 physics
+    // Small platform 2 physics - use wall material for bounce
     const small2Shape = new CANNON.Box(new CANNON.Vec3(2, platformThickness / 2, 2));
     const small2Body = new CANNON.Body({ mass: 0 });
-    small2Body.material = new CANNON.Material('ground');
+    small2Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
     small2Body.addShape(small2Shape);
     small2Body.position.set(2, 3.5, 2);
     this.world.addBody(small2Body);
@@ -553,7 +569,7 @@ export class GameEngine {
     const platformMaterial = new THREE.MeshLambertMaterial({ 
       color: color,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.95
     });
     const platform = new THREE.Mesh(platformGeometry, platformMaterial);
     platform.position.set(x, y, z);
@@ -562,10 +578,10 @@ export class GameEngine {
     this.scene.add(platform);
     this.walls.push(platform);
 
-    // Physics platform
+    // Physics platform - use wall material for bouncy behavior
     const platformShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
     const platformBody = new CANNON.Body({ mass: 0 });
-    platformBody.material = new CANNON.Material('ground');
+    platformBody.material = new CANNON.Material('wall'); // Changed to wall for bounce
     platformBody.addShape(platformShape);
     platformBody.position.set(x, y, z);
     platformBody.type = CANNON.Body.KINEMATIC;
@@ -579,7 +595,7 @@ export class GameEngine {
     const rampMaterial = new THREE.MeshLambertMaterial({ 
       color: color,
       transparent: true,
-      opacity: 0.7
+      opacity: 0.9
     });
     const ramp = new THREE.Mesh(rampGeometry, rampMaterial);
     ramp.position.set(x, y, z);
@@ -589,10 +605,10 @@ export class GameEngine {
     this.scene.add(ramp);
     this.walls.push(ramp);
 
-    // Physics ramp
+    // Physics ramp - use wall material for bouncy behavior
     const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
     const rampBody = new CANNON.Body({ mass: 0 });
-    rampBody.material = new CANNON.Material('ground');
+    rampBody.material = new CANNON.Material('wall'); // Changed to wall for bounce
     rampBody.addShape(rampShape);
     rampBody.position.set(x, y, z);
     rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 8);
@@ -783,27 +799,27 @@ export class GameEngine {
     this.scene.add(downSlope);
 
     // Physics bodies for each section
-    // Up slope physics - lower
+    // Up slope physics - use wall material for bounce
     const upSlopeShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, sectionDepth/2));
     const upSlopeBody = new CANNON.Body({ mass: 0 });
-    upSlopeBody.material = new CANNON.Material('ground');
+    upSlopeBody.material = new CANNON.Material('wall'); // Changed to wall for bounce
     upSlopeBody.addShape(upSlopeShape);
     upSlopeBody.position.set(x, height/4, z - sectionDepth); // Lower
     upSlopeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -slopeAngle);
     this.world.addBody(upSlopeBody);
     
-    // Top physics - lower
+    // Top physics - use wall material for bounce
     const topShape = new CANNON.Box(new CANNON.Vec3(width/2, height/4, sectionDepth/2));
     const topBody = new CANNON.Body({ mass: 0 });
-    topBody.material = new CANNON.Material('ground');
+    topBody.material = new CANNON.Material('wall'); // Changed to wall for bounce
     topBody.addShape(topShape);
     topBody.position.set(x, height/3, z); // Lower peak
     this.world.addBody(topBody);
     
-    // Down slope physics - lower
+    // Down slope physics - use wall material for bounce
     const downSlopeShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, sectionDepth/2));
     const downSlopeBody = new CANNON.Body({ mass: 0 });
-    downSlopeBody.material = new CANNON.Material('ground');
+    downSlopeBody.material = new CANNON.Material('wall'); // Changed to wall for bounce
     downSlopeBody.addShape(downSlopeShape);
     downSlopeBody.position.set(x, height/4, z + sectionDepth); // Lower
     downSlopeBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), slopeAngle);
@@ -832,17 +848,19 @@ export class GameEngine {
     trunk.receiveShadow = true;
     tree.add(trunk);
     
-    // Tree foliage - multiple spheres for natural look
+    // Tree foliage - 2-3 organized spheres with variety
     const foliageColors = [
       0x228B22, // Forest green
       0x32CD32, // Lime green  
-      0x006400  // Dark green
+      0x006400, // Dark green
+      0x2E8B57  // Sea green
     ];
     
-    // Create multiple foliage clusters for a more natural, full appearance
-    for (let i = 0; i < 4; i++) {
-      const foliageRadius = (1.2 + Math.random() * 0.8) * scale;
-      const foliageGeometry = new THREE.SphereGeometry(foliageRadius, 12, 8);
+    // Create 2-3 foliage clusters for natural variety but organized
+    const numClusters = 2 + Math.floor(Math.random() * 2); // 2 or 3 clusters
+    for (let i = 0; i < numClusters; i++) {
+      const foliageRadius = (1.2 + Math.random() * 0.6) * scale; // Varied but controlled size
+      const foliageGeometry = new THREE.SphereGeometry(foliageRadius, 20, 16); // Smoother, less blocky
       const foliageColor = foliageColors[Math.floor(Math.random() * foliageColors.length)];
       const foliageMaterial = new THREE.MeshLambertMaterial({ 
         color: foliageColor,
@@ -851,10 +869,10 @@ export class GameEngine {
       
       const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
       
-      // Position foliage clusters at different heights and slight offsets
-      const offsetX = (Math.random() - 0.5) * 0.8 * scale;
-      const offsetZ = (Math.random() - 0.5) * 0.8 * scale;
-      const foliageY = trunkHeight * (0.6 + i * 0.15) + Math.random() * 0.5;
+      // Organize clusters in a more structured way - main canopy area
+      const offsetX = (Math.random() - 0.5) * 0.4 * scale; // Smaller, controlled offset
+      const offsetZ = (Math.random() - 0.5) * 0.4 * scale; // Smaller, controlled offset
+      const foliageY = trunkHeight * (0.75 + i * 0.1) + Math.random() * 0.3; // Organized vertical spacing
       
       foliage.position.set(offsetX, foliageY, offsetZ);
       foliage.castShadow = true;
@@ -1204,7 +1222,7 @@ export class GameEngine {
     const wallMaterial = new THREE.MeshLambertMaterial({ 
       color: color,
       transparent: true,
-      opacity: 0.7 // 70% opacity, 30% transparent
+      opacity: 0.95 // 95% opacity, 5% transparent
     });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     // Position wall so it extends into the ground to merge with floor
@@ -1214,10 +1232,12 @@ export class GameEngine {
     this.scene.add(wall);
     this.walls.push(wall);
 
-    // Physics wall with bouncy material - ensure it's properly positioned
+    // Physics wall - use obstacleWall for obstacles, wall for boundaries
     const wallShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
     const wallBody = new CANNON.Body({ mass: 0 });
-    wallBody.material = new CANNON.Material('wall');
+    // Use obstacleWall material for better bounce on colored obstacles
+    const isObstacle = color !== 0xD2B48C; // Not tan/boundary color means it's an obstacle
+    wallBody.material = new CANNON.Material(isObstacle ? 'obstacleWall' : 'wall');
     wallBody.addShape(wallShape);
     wallBody.position.set(x, y, z); // Keep physics at original position
     // Make sure walls are solid and can't be passed through
@@ -1233,7 +1253,7 @@ export class GameEngine {
     const wallMaterial = new THREE.MeshLambertMaterial({ 
       color,
       transparent: true,
-      opacity: 0.7 // 70% opacity, 30% transparent
+      opacity: 0.95 // 95% opacity, 5% transparent
     });
     const wall = new THREE.Mesh(wallGeometry, wallMaterial);
     wall.position.set(x, y - 0.25, z); // Lower by 0.25 to merge with ground
