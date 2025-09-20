@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { CatmullRomCurve3 } from 'three';
+import { audioService } from '../services/audioService';
 
 export class GameEngine {
   private canvas: HTMLCanvasElement;
@@ -203,6 +204,65 @@ export class GameEngine {
     this.world.addContactMaterial(ballObstacleWallContact);
     this.world.addContactMaterial(ballBouncyWallContact);
     this.world.addContactMaterial(ballMovingBlockContact);
+    
+    // Set up collision detection for wooden sounds
+    this.setupCollisionDetection();
+  }
+
+  private setupCollisionDetection() {
+    // Add collision event listener for wooden sounds
+    this.world.addEventListener('beginContact', (event: any) => {
+      const { bodyA, bodyB } = event;
+      
+      // Check if one of the bodies is the ball
+      const ballBody = this.ballBody;
+      let otherBody: CANNON.Body | null = null;
+      
+      if (bodyA === ballBody) {
+        otherBody = bodyB;
+      } else if (bodyB === ballBody) {
+        otherBody = bodyA;
+      }
+      
+      if (otherBody && ballBody) {
+        // Get the ball's velocity to determine impact strength
+        const velocity = ballBody.velocity.length();
+        
+        // Only play sound if ball is moving fast enough (minimum velocity threshold)
+        if (velocity > 1.0) {
+          // Check what type of material the ball hit
+          const materialName = otherBody.material?.name;
+          
+          if (materialName === 'wall' || 
+              materialName === 'obstacleWall' || 
+              materialName === 'bouncyWall' || 
+              materialName === 'movingBlock') {
+            
+            // Calculate volume based on impact velocity (0.1 to 0.6 range)
+            const volume = Math.min(0.6, Math.max(0.1, velocity * 0.1));
+            
+            // Calculate pitch variation based on material type
+            let pitch = 1.0;
+            switch (materialName) {
+              case 'obstacleWall':
+                pitch = 1.1; // Slightly higher pitch for obstacles
+                break;
+              case 'bouncyWall':
+                pitch = 1.2; // Higher pitch for bouncy walls
+                break;
+              case 'movingBlock':
+                pitch = 0.9; // Lower pitch for wooden blocks
+                break;
+              default:
+                pitch = 1.0; // Normal pitch for regular walls
+            }
+            
+            // Play the wooden sound
+            audioService.playWoodenSound(volume, pitch);
+          }
+        }
+      }
+    });
   }
 
   private setupLighting() {

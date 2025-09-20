@@ -196,6 +196,109 @@ export class AudioService {
     }
   }
 
+  // Play a wooden sound when ball hits walls or obstacles
+  public async playWoodenSound(volume: number = 0.3, pitch: number = 1.0) {
+    if (this.isMuted) {
+      return;
+    }
+
+    if (!this.audioContext) {
+      await this.initializeAudioContext();
+    }
+
+    try {
+      // Ensure audio context is initialized and resumed
+      await this.initializeAudioContext();
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+
+      if (!this.audioContext) {
+        return;
+      }
+
+      const now = this.audioContext.currentTime;
+      const masterGain = this.audioContext.createGain();
+      masterGain.connect(this.audioContext.destination);
+      masterGain.gain.setValueAtTime(volume, now);
+
+      // Create a realistic wooden impact sound
+      // Combine multiple frequencies to simulate wood collision
+      const woodFrequencies = [
+        { freq: 80 * pitch, gain: 0.6, duration: 0.08 },   // Low thump
+        { freq: 150 * pitch, gain: 0.4, duration: 0.06 },  // Mid body
+        { freq: 300 * pitch, gain: 0.3, duration: 0.04 },  // Higher body
+        { freq: 800 * pitch, gain: 0.2, duration: 0.03 },  // Crack sound
+        { freq: 1200 * pitch, gain: 0.15, duration: 0.02 } // Sharp tap
+      ];
+
+      // Create each frequency component
+      woodFrequencies.forEach((component, index) => {
+        const oscillator = this.audioContext!.createOscillator();
+        const gainNode = this.audioContext!.createGain();
+        
+        // Use triangle wave for warmer wooden sound
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(component.freq, now);
+        
+        // Create realistic attack-decay envelope for wood impact
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(component.gain, now + 0.005); // Very quick attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + component.duration); // Quick decay
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(masterGain);
+        
+        oscillator.start(now);
+        oscillator.stop(now + component.duration);
+      });
+
+      // Add some noise for more realistic wood texture
+      const noiseBuffer = this.createNoiseBuffer(0.05);
+      if (noiseBuffer) {
+        const noiseSource = this.audioContext.createBufferSource();
+        const noiseGain = this.audioContext.createGain();
+        const noiseFilter = this.audioContext.createBiquadFilter();
+        
+        noiseSource.buffer = noiseBuffer;
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.setValueAtTime(400 * pitch, now);
+        noiseFilter.Q.setValueAtTime(2, now);
+        
+        // Quick noise burst
+        noiseGain.gain.setValueAtTime(0, now);
+        noiseGain.gain.linearRampToValueAtTime(0.1 * volume, now + 0.002);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+        
+        noiseSource.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(masterGain);
+        
+        noiseSource.start(now);
+        noiseSource.stop(now + 0.05);
+      }
+    } catch (error) {
+      console.warn('Could not play wooden sound:', error);
+    }
+  }
+
+  // Helper method to create noise buffer for texture
+  private createNoiseBuffer(duration: number): AudioBuffer | null {
+    if (!this.audioContext) return null;
+
+    const sampleRate = this.audioContext.sampleRate;
+    const bufferSize = sampleRate * duration;
+    const buffer = this.audioContext.createBuffer(1, bufferSize, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    // Generate white noise
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.1; // Low amplitude noise
+    }
+
+    return buffer;
+  }
+
   // Clean up resources
   public dispose() {
     if (this.audioContext && this.audioContext.state !== 'closed') {
