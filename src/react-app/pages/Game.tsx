@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pause, Volume2, Trophy, ArrowRight, RotateCcw as Replay } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router';
 import { LeaderboardService } from '../services/leaderboard';
+import { audioService } from '../services/audioService';
 
 export default function Game() {
   const navigate = useNavigate();
@@ -30,6 +31,9 @@ export default function Game() {
         gameInstanceRef.current = new GameEngine(canvas, level, (_, strokes) => {
           setCompletedStrokes(strokes);
           setShowCongrats(true);
+          
+          // Play celebratory sound
+          audioService.playCelebrationSound();
           
           // Get player name and add to leaderboard
           const playerName = localStorage.getItem('playerName') || 'Anonymous';
@@ -62,6 +66,8 @@ export default function Game() {
       if (gameInstanceRef.current) {
         gameInstanceRef.current.dispose();
       }
+      // Don't dispose audio service on level changes - only dispose on app shutdown
+      // audioService.dispose();
     };
   }, [currentLevel]);
 
@@ -89,6 +95,10 @@ export default function Game() {
   };
 
   const toggleMute = () => {
+    // Toggle mute in our audio service
+    const isMuted = audioService.toggleMute();
+    
+    // Also toggle mute in game engine if it exists
     if (gameInstanceRef.current) {
       gameInstanceRef.current.toggleMute();
     }

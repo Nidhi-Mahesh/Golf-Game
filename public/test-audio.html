@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            text-align: center;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            font-size: 16px;
+            margin: 4px 2px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Golf Game Audio Test</h1>
+    <p>Click the button to test the celebratory sound:</p>
+    <button onclick="testCelebrationSound()">🎉 Play Celebration Sound</button>
+    <button onclick="testSuccessChime()">🔔 Play Success Chime</button>
+    <button onclick="testBasicBeep()">🔊 Test Basic Beep</button>
+    <div id="status" style="margin: 20px; padding: 10px; background: #f0f0f0; border-radius: 5px;">Ready to test audio...</div>
+    
+    <script>
+        class AudioService {
+            constructor() {
+                this.audioContext = null;
+                this.isMuted = false;
+                this.initializeAudioContext();
+            }
+
+            async initializeAudioContext() {
+                if (!this.audioContext) {
+                    try {
+                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        if (this.audioContext.state === 'suspended') {
+                            await this.audioContext.resume();
+                        }
+                    } catch (error) {
+                        console.warn('Audio not supported:', error);
+                    }
+                }
+            }
+
+            async playCelebrationSound() {
+                if (this.isMuted || !this.audioContext) {
+                    return;
+                }
+
+                try {
+                    await this.initializeAudioContext();
+                    if (this.audioContext && this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                    }
+
+                    if (!this.audioContext) return;
+
+                    this.playFanfareSound();
+                } catch (error) {
+                    console.warn('Could not play celebration sound:', error);
+                }
+            }
+
+            playFanfareSound() {
+                if (!this.audioContext) return;
+
+                const now = this.audioContext.currentTime;
+                const masterGain = this.audioContext.createGain();
+                masterGain.connect(this.audioContext.destination);
+                masterGain.gain.setValueAtTime(0.3, now);
+
+                const notes = [
+                    { freq: 523.25, start: 0, duration: 0.15 },
+                    { freq: 659.25, start: 0.1, duration: 0.15 },
+                    { freq: 783.99, start: 0.2, duration: 0.15 },
+                    { freq: 1046.5, start: 0.3, duration: 0.25 },
+                    { freq: 1046.5, start: 0.5, duration: 0.15 },
+                    { freq: 1174.66, start: 0.6, duration: 0.2 },
+                    { freq: 1318.51, start: 0.75, duration: 0.3 }
+                ];
+
+                notes.forEach((note) => {
+                    this.playNote(masterGain, note.freq, now + note.start, note.duration);
+                });
+
+                setTimeout(() => {
+                    this.playSparkleEffect();
+                }, 200);
+            }
+
+            playNote(destination, frequency, startTime, duration) {
+                if (!this.audioContext) return;
+
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.type = 'triangle';
+                oscillator.frequency.setValueAtTime(frequency, startTime);
+                
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(0.8, startTime + 0.02);
+                gainNode.gain.exponentialRampToValueAtTime(0.3, startTime + duration * 0.3);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(destination);
+                
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
+            }
+
+            playSparkleEffect() {
+                if (!this.audioContext) return;
+
+                const now = this.audioContext.currentTime;
+                const sparkleGain = this.audioContext.createGain();
+                sparkleGain.connect(this.audioContext.destination);
+                sparkleGain.gain.setValueAtTime(0.15, now);
+
+                const sparkleNotes = [
+                    { freq: 1568, start: 0, duration: 0.1 },
+                    { freq: 1760, start: 0.05, duration: 0.1 },
+                    { freq: 1975.5, start: 0.1, duration: 0.1 },
+                    { freq: 2093, start: 0.15, duration: 0.12 },
+                    { freq: 2217.46, start: 0.25, duration: 0.1 }
+                ];
+
+                sparkleNotes.forEach((note) => {
+                    this.playSparkleNote(sparkleGain, note.freq, now + note.start, note.duration);
+                });
+            }
+
+            playSparkleNote(destination, frequency, startTime, duration) {
+                if (!this.audioContext) return;
+
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, startTime);
+                
+                gainNode.gain.setValueAtTime(0, startTime);
+                gainNode.gain.linearRampToValueAtTime(0.6, startTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(destination);
+                
+                oscillator.start(startTime);
+                oscillator.stop(startTime + duration);
+            }
+
+            async playSuccessChime() {
+                if (this.isMuted || !this.audioContext) {
+                    return;
+                }
+
+                try {
+                    await this.initializeAudioContext();
+                    if (this.audioContext && this.audioContext.state === 'suspended') {
+                        await this.audioContext.resume();
+                    }
+
+                    if (!this.audioContext) return;
+
+                    const now = this.audioContext.currentTime;
+                    const masterGain = this.audioContext.createGain();
+                    masterGain.connect(this.audioContext.destination);
+                    masterGain.gain.setValueAtTime(0.4, now);
+
+                    const chimeNotes = [
+                        { freq: 523.25, start: 0, duration: 0.3 },
+                        { freq: 659.25, start: 0.15, duration: 0.3 },
+                        { freq: 783.99, start: 0.3, duration: 0.4 },
+                    ];
+
+                    chimeNotes.forEach((note) => {
+                        this.playNote(masterGain, note.freq, now + note.start, note.duration);
+                    });
+                } catch (error) {
+                    console.warn('Could not play success chime:', error);
+                }
+            }
+        }
+
+        const audioService = new AudioService();
+
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+            console.log(message);
+        }
+
+        function testCelebrationSound() {
+            updateStatus('🎉 Testing celebration sound...');
+            audioService.playCelebrationSound();
+        }
+
+        function testSuccessChime() {
+            updateStatus('🔔 Testing success chime...');
+            audioService.playSuccessChime();
+        }
+
+        function testBasicBeep() {
+            updateStatus('🔊 Testing basic beep...');
+            
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+                
+                updateStatus('✅ Basic beep should have played');
+            } catch (error) {
+                updateStatus('❌ Basic beep failed: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

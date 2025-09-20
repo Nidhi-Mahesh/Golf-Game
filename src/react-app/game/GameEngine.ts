@@ -1381,13 +1381,13 @@ export class GameEngine {
   }
 
   private updateAimingUI() {
-    const power = this.aimStart.distanceTo(this.aimCurrent) * 70;
-    const clampedPower = Math.min(power, 70);
+    const power = this.aimStart.distanceTo(this.aimCurrent) * 53;
+    const clampedPower = Math.min(power, 53);
     
     // Update power meter
     const powerMeter = document.getElementById('power-meter');
     if (powerMeter) {
-      powerMeter.style.height = `${(clampedPower / 70) * 100}%`;
+      powerMeter.style.height = `${(clampedPower / 53) * 100}%`;
     }
 
     // Update aiming line
@@ -1427,7 +1427,7 @@ export class GameEngine {
       // Create dotted trail with varying sizes - more realistic trajectory
       const points = [];
       const ballPos = this.ball.position.clone();
-      const power = Math.min(aimDistance * 80 * 3.0, 80); // Match new power calculation
+      const power = Math.min(aimDistance * 60 * 3.0, 60); // Match reduced power calculation
       const trailLength = Math.min(power * 2.0, 60); // Longer trail for higher power
       
       // Create multiple segments for dotted effect
@@ -1516,7 +1516,7 @@ export class GameEngine {
     
     if (aimDistance > 0.05) { // Minimum drag distance
       // Calculate power based on drag distance
-      const maxPower = 80; // SUPER high maximum shot power
+      const maxPower = 60; // Reduced from 80 (25% power reduction)
       const power = Math.min(aimDistance * maxPower * 3.0, maxPower); // 3x multiplier for explosive power
       
       // Get ball position in screen space
