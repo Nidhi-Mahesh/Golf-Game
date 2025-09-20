@@ -143,7 +143,7 @@ export default function Game() {
   const getParForLevel = (level: number) => {
     if (level === 1) return 3; // Simple 3-block layout
     if (level === 2) return 5; // Bumpy terrain (was Level 3)
-    if (level === 3) return 4; // Curved slide (was Level 4)
+    if (level === 3) return 4; // Spiral slide course
     if (level === 4) return 4; // Multi-tier platforms (new)
     if (level === 5) return 4; // Circular course (was Level 2)
     return 3;

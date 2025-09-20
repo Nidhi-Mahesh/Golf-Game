@@ -41,7 +41,7 @@ export class GameEngine {
       case 2:
         return { distance: 3.8, height: 1.5, fov: 72 }; // Was Level 3 (bumpy terrain)
       case 3:
-        return { distance: 4.0, height: 1.6, fov: 74 }; // Was Level 4 (curved slide)
+        return { distance: 4.0, height: 2.5, fov: 75 }; // Ramp - good distance for longer ramp, higher view, wider FOV
       case 4:
         return { distance: 3.2, height: 1.3, fov: 68 }; // New multi-tier level
       case 5:
@@ -137,12 +137,12 @@ export class GameEngine {
       ballMaterial,
       groundMaterial,
       {
-        friction: 0.1, // Reduced friction as requested
-        restitution: 0.4, // Increased ground bounce for obstacles
-        frictionEquationStiffness: 1e7, // Reduced for stability
-        frictionEquationRelaxation: 4,
-        contactEquationStiffness: 1e8,
-        contactEquationRelaxation: 3
+        friction: this.currentLevel === 3 ? 0.4 : 0.1, // Moderate friction for smooth ramp rolling
+        restitution: this.currentLevel === 3 ? 0.01 : 0.4, // Almost no bounce for Level 3 ramp
+        frictionEquationStiffness: this.currentLevel === 3 ? 1e8 : 1e8, // Stable stiffness
+        frictionEquationRelaxation: this.currentLevel === 3 ? 4 : 3, // Smoother response
+        contactEquationStiffness: this.currentLevel === 3 ? 1e8 : 1e9, // Stable contact
+        contactEquationRelaxation: this.currentLevel === 3 ? 3 : 2 // Smoother contact response
       }
     );
     
@@ -462,123 +462,195 @@ export class GameEngine {
   }
 
   private setupLevel3() {
-    // Multi-layer jumping course - disconnected platforms at different heights
-    const platformMaterial = new THREE.MeshLambertMaterial({ color: 0x87CEEB }); // Sky blue platforms
-    const platformSize = 8;
-    const platformThickness = 1.0; // Thicker platforms to prevent pass-through
+    // Level 3 - Simple Bezier Curve Ramp
     
-    // Layer 1 (Top) - Starting platform
-    const layer1Height = 8;
-    const layer1Platform = new THREE.BoxGeometry(platformSize, platformThickness, platformSize);
-    const layer1Mesh = new THREE.Mesh(layer1Platform, platformMaterial);
-    layer1Mesh.position.set(0, layer1Height, 0);
-    layer1Mesh.castShadow = true;
-    layer1Mesh.receiveShadow = true;
-    this.scene.add(layer1Mesh);
-    
-    // Layer 1 physics - use wall material for bounce
-    const layer1Shape = new CANNON.Box(new CANNON.Vec3(platformSize / 2, platformThickness / 2, platformSize / 2));
-    const layer1Body = new CANNON.Body({ mass: 0 });
-    layer1Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
-    layer1Body.addShape(layer1Shape);
-    layer1Body.position.set(0, layer1Height, 0);
-    this.world.addBody(layer1Body);
-    
-    // Layer 2 (Middle) - Disconnected from layer 1
-    const layer2Height = 6; // Raised higher to make more challenging
-    const layer2X = 12; // Offset to the right
-    const layer2Z = -8; // Offset backward
-    const layer2Platform = new THREE.BoxGeometry(platformSize, platformThickness, platformSize);
-    const layer2Mesh = new THREE.Mesh(layer2Platform, platformMaterial);
-    layer2Mesh.position.set(layer2X, layer2Height, layer2Z);
-    layer2Mesh.castShadow = true;
-    layer2Mesh.receiveShadow = true;
-    this.scene.add(layer2Mesh);
-    
-    // Layer 2 physics - use wall material for bounce
-    const layer2Shape = new CANNON.Box(new CANNON.Vec3(platformSize / 2, platformThickness / 2, platformSize / 2));
-    const layer2Body = new CANNON.Body({ mass: 0 });
-    layer2Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
-    layer2Body.addShape(layer2Shape);
-    layer2Body.position.set(layer2X, layer2Height, layer2Z);
-    this.world.addBody(layer2Body);
-    
-    // Layer 3 (Bottom) - Final platform with hole - Disconnected from layer 2
-    const layer3Height = 1;
-    const layer3X = -10; // Offset to the left
-    const layer3Z = 10; // Offset forward
-    const layer3Platform = new THREE.BoxGeometry(platformSize + 2, platformThickness, platformSize + 2);
-    const finalPlatformMaterial = new THREE.MeshLambertMaterial({ color: 0x6fbf73 }); // Green for final platform
-    const layer3Mesh = new THREE.Mesh(layer3Platform, finalPlatformMaterial);
-    layer3Mesh.position.set(layer3X, layer3Height, layer3Z);
-    layer3Mesh.castShadow = true;
-    layer3Mesh.receiveShadow = true;
-    this.scene.add(layer3Mesh);
-    
-    // Layer 3 physics - use wall material for bounce
-    const layer3Shape = new CANNON.Box(new CANNON.Vec3((platformSize + 2) / 2, platformThickness / 2, (platformSize + 2) / 2));
-    const layer3Body = new CANNON.Body({ mass: 0 });
-    layer3Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
-    layer3Body.addShape(layer3Shape);
-    layer3Body.position.set(layer3X, layer3Height, layer3Z);
-    this.world.addBody(layer3Body);
-    
-    // Add some smaller intermediate jumping platforms for extra challenge
-    // Small platform 1 - between layer 1 and 2
-    const smallPlatform1 = new THREE.BoxGeometry(4, platformThickness, 4);
-    const smallPlatform1Material = new THREE.MeshLambertMaterial({ color: 0xFFD700 }); // Gold
-    const small1Mesh = new THREE.Mesh(smallPlatform1, smallPlatform1Material);
-    small1Mesh.position.set(6, 7, -4); // Adjusted height for new layer 2 height
-    small1Mesh.castShadow = true;
-    small1Mesh.receiveShadow = true;
-    this.scene.add(small1Mesh);
-    
-    // Small platform 1 physics - use wall material for bounce
-    const small1Shape = new CANNON.Box(new CANNON.Vec3(2, platformThickness / 2, 2));
-    const small1Body = new CANNON.Body({ mass: 0 });
-    small1Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
-    small1Body.addShape(small1Shape);
-    small1Body.position.set(6, 7, -4);
-    this.world.addBody(small1Body);
-    
-    // Small platform 2 - between layer 2 and 3
-    const smallPlatform2 = new THREE.BoxGeometry(4, platformThickness, 4);
-    const small2Mesh = new THREE.Mesh(smallPlatform2, smallPlatform1Material);
-    small2Mesh.position.set(2, 3.5, 2); // Adjusted height between layer 2 (6) and layer 3 (1)
-    small2Mesh.castShadow = true;
-    small2Mesh.receiveShadow = true;
-    this.scene.add(small2Mesh);
-    
-    // Small platform 2 physics - use wall material for bounce
-    const small2Shape = new CANNON.Box(new CANNON.Vec3(2, platformThickness / 2, 2));
-    const small2Body = new CANNON.Body({ mass: 0 });
-    small2Body.material = new CANNON.Material('obstacleWall'); // Super bouncy obstacle
-    small2Body.addShape(small2Shape);
-    small2Body.position.set(2, 3.5, 2);
-    this.world.addBody(small2Body);
-    
-    // Main ground platform at the very bottom for safety
-    const groundGeom = new THREE.BoxGeometry(50, 0.5, 50);
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); // Brown ground
-    this.ground = new THREE.Mesh(groundGeom, groundMaterial);
-    this.ground.position.set(0, -2, 0);
+    // Create larger ground plane for curved ramp
+    const groundGeometry = new THREE.PlaneGeometry(80, 80);
+    const groundMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x4caf50, // Green ground
+      transparent: false
+    });
+    this.ground = new THREE.Mesh(groundGeometry, groundMaterial);
+    this.ground.rotation.x = -Math.PI / 2; // Rotate to be flat
     this.ground.receiveShadow = true;
     this.scene.add(this.ground);
-    
-    // Ground physics
-    const groundShape = new CANNON.Box(new CANNON.Vec3(25, 0.25, 25));
-    const groundBody = new CANNON.Body({ mass: 0 });
+
+    // Ground physics - larger to match curved path
+    const groundShape = new CANNON.Box(new CANNON.Vec3(40, 0.1, 40));
+    const groundBody = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC });
     groundBody.material = new CANNON.Material('ground');
     groundBody.addShape(groundShape);
-    groundBody.position.set(0, -2, 0);
+    groundBody.position.set(0, -0.1, 0);
     this.world.addBody(groundBody);
+
+    // Create the Bezier curve ramp
+    this.createBezierRamp();
     
-    // Ball starting position - securely on layer 1 (top platform)
-    this.ballStartPos = new THREE.Vector3(0, layer1Height + platformThickness/2 + 0.3, 0);
+    // Ball starting position - at the top of the longer ramp
+    this.ballStartPos = new THREE.Vector3(0, 8.5, -15); // Top of longer ramp
     
-    // Hole on the final platform (layer 3)
-    this.createHole(layer3X, layer3Z);
+    // Hole at the bottom of the longer ramp
+    this.createHole(0, 15);
   }
+
+  private createBezierRamp() {
+    // Define control points for a curved, challenging ramp using Bezier curve
+    const startPoint = new THREE.Vector3(0, 8, -15);
+    const controlPoint1 = new THREE.Vector3(-4, 6, -5);  // Curve left first
+    const controlPoint2 = new THREE.Vector3(6, 2, 8);    // Then curve right
+    const endPoint = new THREE.Vector3(0, 0, 15);
+    
+    // Create cubic Bezier curve
+    const curve = new THREE.CubicBezierCurve3(
+      startPoint,
+      controlPoint1, 
+      controlPoint2,
+      endPoint
+    );
+    
+    // Create smooth extruded ramp geometry instead of segments
+    const rampWidth = 2.2; // Narrower for more challenge
+    const boundaryHeight = 0.8; // Slightly higher boundaries
+    
+    // Brown material for the ramp
+    const rampMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x8B4513 // Brown color
+    });
+    
+    // Darker brown material for boundaries
+    const boundaryMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x654321 // Darker brown for boundaries
+    });
+    
+    // Create brown plane segments following the curve
+    const planeSegments = 80;
+    
+    for (let i = 0; i < planeSegments; i++) {
+      const t1 = i / planeSegments;
+      const t2 = (i + 1) / planeSegments;
+      
+      const point1 = curve.getPoint(t1);
+      const point2 = curve.getPoint(t2);
+      
+      const segmentLength = point1.distanceTo(point2);
+      const midPoint = point1.clone().lerp(point2, 0.5);
+      const direction = point2.clone().sub(point1).normalize();
+      
+      // Create brown plane segment
+      const planeGeometry = new THREE.PlaneGeometry(rampWidth, segmentLength);
+      const planeMesh = new THREE.Mesh(planeGeometry, rampMaterial);
+      
+      planeMesh.position.copy(midPoint);
+      
+      // Rotate to align with curve and lie flat
+      const angle = Math.atan2(direction.x, direction.z);
+      const pitch = Math.atan2(-direction.y, Math.sqrt(direction.x * direction.x + direction.z * direction.z));
+      planeMesh.rotation.set(pitch - Math.PI/2, angle, 0, 'XYZ'); // -PI/2 to make it horizontal
+      
+      planeMesh.castShadow = true;
+      planeMesh.receiveShadow = true;
+      
+      this.scene.add(planeMesh);
+      this.walls.push(planeMesh);
+    }
+    
+    // Create fewer, much larger overlapping physics segments for smooth rolling
+    const physicsSegments = 8; // Very few segments
+    const overlapFactor = 1.8; // Heavy overlap between segments
+    
+    for (let i = 0; i < physicsSegments; i++) {
+      const t = i / (physicsSegments - 1); // Distribute evenly from 0 to 1
+      const point = curve.getPoint(t);
+      const tangent = curve.getTangent(t).normalize();
+      
+      // Create very large segments that heavily overlap
+      const segmentLength = (30 / physicsSegments) * overlapFactor; // Much larger segments
+      const segmentShape = new CANNON.Box(new CANNON.Vec3(rampWidth/2 + 0.2, 0.2, segmentLength/2));
+      const segmentBody = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC });
+      segmentBody.material = new CANNON.Material('ground');
+      segmentBody.addShape(segmentShape);
+      segmentBody.position.copy(point);
+      
+      // Calculate proper rotation to match the curve slope
+      const angle = Math.atan2(tangent.x, tangent.z);
+      const pitch = Math.atan2(-tangent.y, Math.sqrt(tangent.x * tangent.x + tangent.z * tangent.z));
+      segmentBody.quaternion.setFromEuler(pitch, angle, 0, 'XYZ');
+      
+      this.world.addBody(segmentBody);
+      this.wallBodies.push(segmentBody);
+    }
+    
+    // Create boundary walls using extruded geometry
+    const numBoundarySegments = 60;
+    for (let i = 0; i < numBoundarySegments; i++) {
+      const t1 = i / numBoundarySegments;
+      const t2 = (i + 1) / numBoundarySegments;
+      
+      const point1 = curve.getPoint(t1);
+      const point2 = curve.getPoint(t2);
+      
+      const segmentLength = point1.distanceTo(point2);
+      const midPoint = point1.clone().lerp(point2, 0.5);
+      const direction = point2.clone().sub(point1).normalize();
+      const perpendicular = new THREE.Vector3(-direction.z, 0, direction.x).normalize();
+      
+      // Left boundary
+      const leftBoundaryGeometry = new THREE.BoxGeometry(0.2, boundaryHeight, segmentLength * 1.1);
+      const leftBoundary = new THREE.Mesh(leftBoundaryGeometry, boundaryMaterial);
+      
+      const leftBoundaryPos = midPoint.clone().add(perpendicular.clone().multiplyScalar(-rampWidth/2 - 0.1));
+      leftBoundaryPos.y += boundaryHeight/2;
+      leftBoundary.position.copy(leftBoundaryPos);
+      leftBoundary.lookAt(leftBoundaryPos.clone().add(direction));
+      
+      leftBoundary.castShadow = true;
+      leftBoundary.receiveShadow = true;
+      
+      this.scene.add(leftBoundary);
+      this.walls.push(leftBoundary);
+      
+      // Left boundary physics
+      const leftBoundaryShape = new CANNON.Box(new CANNON.Vec3(0.1, boundaryHeight/2, segmentLength/2));
+      const leftBoundaryBody = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC });
+      leftBoundaryBody.material = new CANNON.Material('wall');
+      leftBoundaryBody.addShape(leftBoundaryShape);
+      leftBoundaryBody.position.copy(leftBoundaryPos);
+      const angle = Math.atan2(direction.x, direction.z);
+      leftBoundaryBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), angle);
+      
+      this.world.addBody(leftBoundaryBody);
+      this.wallBodies.push(leftBoundaryBody);
+      
+      // Right boundary
+      const rightBoundaryGeometry = new THREE.BoxGeometry(0.2, boundaryHeight, segmentLength * 1.1);
+      const rightBoundary = new THREE.Mesh(rightBoundaryGeometry, boundaryMaterial);
+      
+      const rightBoundaryPos = midPoint.clone().add(perpendicular.clone().multiplyScalar(rampWidth/2 + 0.1));
+      rightBoundaryPos.y += boundaryHeight/2;
+      rightBoundary.position.copy(rightBoundaryPos);
+      rightBoundary.lookAt(rightBoundaryPos.clone().add(direction));
+      
+      rightBoundary.castShadow = true;
+      rightBoundary.receiveShadow = true;
+      
+      this.scene.add(rightBoundary);
+      this.walls.push(rightBoundary);
+      
+      // Right boundary physics
+      const rightBoundaryShape = new CANNON.Box(new CANNON.Vec3(0.1, boundaryHeight/2, segmentLength/2));
+      const rightBoundaryBody = new CANNON.Body({ mass: 0, type: CANNON.Body.STATIC });
+      rightBoundaryBody.material = new CANNON.Material('wall');
+      rightBoundaryBody.addShape(rightBoundaryShape);
+      rightBoundaryBody.position.copy(rightBoundaryPos);
+      rightBoundaryBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), angle);
+      
+      this.world.addBody(rightBoundaryBody);
+      this.wallBodies.push(rightBoundaryBody);
+    }
+    
+    console.log('Smooth brown Bezier ramp with boundaries created!');
+  }
+
 
   private setupLevel4() {
     // Simple ground level with moving blocks only
@@ -1159,7 +1231,7 @@ export class GameEngine {
   }
 
   private createRealisticHole(x: number, z: number) {
-    const holeRadius = 0.54; // Standard golf hole radius (4.25 inches = ~0.54 units)
+    const holeRadius = this.currentLevel === 3 ? 1.2 : 0.54; // Much bigger hole for Level 3
     const holeDepth = 0.4; // Reasonable hole depth
     
     // Create a clean, simple hole that looks professional
@@ -1347,28 +1419,51 @@ export class GameEngine {
   }
 
   private setupBall() {
-    // Visual ball
-    const ballGeometry = new THREE.SphereGeometry(0.3, 16, 16);
-    const ballMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+    // Visual ball - smaller white ball for Level 3
+    const ballRadius = this.currentLevel === 3 ? 0.2 : 0.3; // Smaller for Level 3
+    const ballGeometry = new THREE.SphereGeometry(ballRadius, 16, 16);
+    const ballMaterial = new THREE.MeshStandardMaterial({ color: 0xFFFFFF }); // White ball
     this.ball = new THREE.Mesh(ballGeometry, ballMaterial);
     this.ball.castShadow = true;
     this.ball.position.copy(this.ballStartPos);
     this.scene.add(this.ball);
 
-    // Physics ball
-    const ballShape = new CANNON.Sphere(0.3);
-    this.ballBody = new CANNON.Body({ mass: 1 });
+    // Physics ball - dynamic sphere affected by gravity
+    const ballShape = new CANNON.Sphere(ballRadius);
+    const ballMass = this.currentLevel === 3 ? 1 : 1; // Standard mass
+    this.ballBody = new CANNON.Body({ mass: ballMass });
     this.ballBody.material = new CANNON.Material('ball');
     this.ballBody.addShape(ballShape);
     this.ballBody.position.set(this.ballStartPos.x, this.ballStartPos.y, this.ballStartPos.z);
-    this.ballBody.linearDamping = 0.5;
-    this.ballBody.angularDamping = 0.5;
+    
+    // Adjust damping for Level 3
+    if (this.currentLevel === 3) {
+      this.ballBody.linearDamping = 0.005;  // Almost no linear damping for free rolling
+      this.ballBody.angularDamping = 0.01;  // Almost no angular damping
+      
+      // Optimize ball material for smooth rolling
+      this.ballBody.material.friction = 0.3;      // Moderate friction for grip
+      this.ballBody.material.restitution = 0.01;  // Almost no bounce
+      
+      // Make ball slightly heavier for more stable rolling
+      this.ballBody.mass = 2;
+      this.ballBody.updateMassProperties();
+      
+      // Disable physics initially - ball won't move until pushed
+      this.ballBody.type = CANNON.Body.KINEMATIC;
+      this.ballBody.velocity.set(0, 0, 0);
+      this.ballBody.angularVelocity.set(0, 0, 0);
+    } else {
+      this.ballBody.linearDamping = 0.5;
+      this.ballBody.angularDamping = 0.5;
+    }
+    
     this.world.addBody(this.ballBody);
   }
 
   private setupControls() {
-    // Orbital controls would go here if using OrbitControls
-    // For now, we'll implement basic mouse controls
+    // All levels use the existing first-person camera system
+    // OrbitControls removed for consistency
   }
 
   private setupEventListeners() {
@@ -1605,6 +1700,12 @@ export class GameEngine {
       worldDirection.addScaledVector(cameraDirection, -direction.z);
       worldDirection.normalize();
       
+      // Enable physics for Level 3 when ball is hit
+      if (this.currentLevel === 3) {
+        this.ballBody.type = CANNON.Body.DYNAMIC;
+        this.ballBody.updateMassProperties();
+      }
+      
       // Apply impulse to ball
       const impulse = worldDirection.multiplyScalar(power);
       this.ballBody.applyImpulse(new CANNON.Vec3(impulse.x, 0, impulse.z));
@@ -1642,6 +1743,11 @@ export class GameEngine {
     this.holeCompletedTriggered = false;
     this.strokes = 0;
     this.updateScore();
+    
+    // Disable physics for Level 3 until ball is hit
+    if (this.currentLevel === 3) {
+      this.ballBody.type = CANNON.Body.KINEMATIC;
+    }
   }
 
   public getCurrentLevel() {
@@ -1718,8 +1824,8 @@ export class GameEngine {
         outOfBounds = true;
       }
     } else if (currentLevel === 3) {
-      // Level 3 boundaries - larger area
-      if (ballPosition.x > 15.5 || ballPosition.x < -15.5 || ballPosition.z > 20.5 || ballPosition.z < -20.5 || ballPosition.y < -5) {
+      // Level 3 curved ramp boundaries - wider area for curved path
+      if (ballPosition.x > 25 || ballPosition.x < -25 || ballPosition.z > 20 || ballPosition.z < -20 || ballPosition.y < -5) {
         outOfBounds = true;
       }
     } else if (currentLevel === 4) {
@@ -1750,7 +1856,7 @@ export class GameEngine {
       );
       const ballY = ballPosition.y;
       const ballSpeed = this.ballBody.velocity.length();
-      const holeRadius = 0.54;
+      const holeRadius = this.currentLevel === 3 ? 1.2 : 0.54; // Much bigger hole for Level 3
       
       // Create realistic hole entry conditions
       const isNearHole = distanceToHole < holeRadius + 0.1;
@@ -1902,28 +2008,89 @@ export class GameEngine {
     // Get ball position
     const ballPos = this.ball ? this.ball.position : this.ballStartPos;
     
-    // Calculate camera position behind the ball
+    if (this.currentLevel === 3) {
+      // Special roller coaster camera for Level 3
+      this.updateRollerCoasterCamera(ballPos);
+    } else {
+      // Standard first-person camera for other levels
+      // Calculate camera position behind the ball
+      const cameraOffset = new THREE.Vector3(
+        -Math.sin(this.cameraAngleY) * this.firstPersonDistance,
+        this.firstPersonHeight,
+        -Math.cos(this.cameraAngleY) * this.firstPersonDistance
+      );
+      
+      const cameraPos = ballPos.clone().add(cameraOffset);
+      
+      // Smooth camera movement
+      this.smoothCameraTarget.lerp(ballPos, 0.05);
+      
+      // Position camera
+      this.camera.position.copy(cameraPos);
+      
+      // Look slightly ahead of the ball toward the goal direction
+      const lookAtTarget = ballPos.clone().add(
+        this.goalDirection.clone().multiplyScalar(2)
+      );
+      lookAtTarget.y = ballPos.y + 0.2; // Look slightly up to see the ball and hole
+      
+      this.camera.lookAt(lookAtTarget);
+    }
+  }
+  
+  private updateRollerCoasterCamera(ballPos: THREE.Vector3) {
+    // Enhanced camera for Level 3 - always stays behind the ball
+    
+    // Calculate ball velocity to determine movement direction
+    const ballVelocity = this.ballBody ? new THREE.Vector3(
+      this.ballBody.velocity.x,
+      this.ballBody.velocity.y,
+      this.ballBody.velocity.z
+    ) : new THREE.Vector3(0, 0, 1); // Default forward direction for ramp
+    
+    // Always position camera behind the ball relative to its movement direction
+    // Default to behind the ramp direction when ball is stationary
+    let behindDirection;
+    if (ballVelocity.length() > 0.2) {
+      // Ball is moving - position camera opposite to movement direction
+      behindDirection = ballVelocity.clone().normalize().negate();
+    } else {
+      // Ball is stationary - position camera behind relative to ramp (up the ramp)
+      behindDirection = new THREE.Vector3(0, 0, -1);
+    }
+    
+    // Position camera behind and above the ball
     const cameraOffset = new THREE.Vector3(
-      -Math.sin(this.cameraAngleY) * this.firstPersonDistance,
+      behindDirection.x * this.firstPersonDistance,
       this.firstPersonHeight,
-      -Math.cos(this.cameraAngleY) * this.firstPersonDistance
+      behindDirection.z * this.firstPersonDistance
     );
     
-    const cameraPos = ballPos.clone().add(cameraOffset);
+    // Add horizontal offset based on manual camera angle (for user control)
+    const horizontalOffset = new THREE.Vector3(
+      Math.sin(this.cameraAngleY) * 1.0,
+      0,
+      Math.cos(this.cameraAngleY) * 1.0
+    );
+    cameraOffset.add(horizontalOffset);
+    
+    const targetCameraPos = ballPos.clone().add(cameraOffset);
     
     // Smooth camera movement
-    this.smoothCameraTarget.lerp(ballPos, 0.05);
+    this.camera.position.lerp(targetCameraPos, 0.1);
     
-    // Position camera
-    this.camera.position.copy(cameraPos);
+    // Always look at the ball
+    const lookAtTarget = ballPos.clone();
+    lookAtTarget.y += 0.1; // Look slightly above the ball
     
-    // Look slightly ahead of the ball toward the goal direction
-    const lookAtTarget = ballPos.clone().add(
-      this.goalDirection.clone().multiplyScalar(2)
-    );
-    lookAtTarget.y = ballPos.y + 0.2; // Look slightly up to see the ball and hole
+    // Smoothly interpolate the look-at target
+    this.smoothCameraTarget.lerp(lookAtTarget, 0.15);
+    this.camera.lookAt(this.smoothCameraTarget);
     
-    this.camera.lookAt(lookAtTarget);
+    // Ensure camera stays at reasonable height
+    if (this.camera.position.y < ballPos.y + 1.0) {
+      this.camera.position.y = ballPos.y + 1.0;
+    }
   }
 
   private updateCameraForLevel() {

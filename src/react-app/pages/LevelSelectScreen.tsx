@@ -111,7 +111,7 @@ export default function LevelSelectScreen() {
       case 2:
         return "Bumpy Terrain";
       case 3:
-        return "Platform Jumps";
+        return "Roller Coaster";
       case 4:
         return "Moving Blocks";
       case 5:

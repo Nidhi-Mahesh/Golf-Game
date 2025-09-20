@@ -13,11 +13,17 @@ export default function Leaderboard({ maxEntries = 10 }: LeaderboardProps) {
   const [overallScores, setOverallScores] = useState<{ playerName: string; totalStrokes: number; levelsCompleted: number }[]>([]);
 
   useEffect(() => {
-    if (selectedLevel === 'overall') {
-      setOverallScores(LeaderboardService.getOverallLeaderboard(maxEntries));
-    } else {
-      setLevelScores(LeaderboardService.getTopScoresForLevel(selectedLevel, maxEntries));
-    }
+    const loadScores = async () => {
+      if (selectedLevel === 'overall') {
+        const scores = await LeaderboardService.getOverallLeaderboard(maxEntries);
+        setOverallScores(scores);
+      } else {
+        const scores = await LeaderboardService.getTopScoresForLevel(selectedLevel, maxEntries);
+        setLevelScores(scores);
+      }
+    };
+
+    loadScores();
   }, [selectedLevel, maxEntries]);
 
   const getRankIcon = (rank: number) => {

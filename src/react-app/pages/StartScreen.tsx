@@ -1,38 +1,30 @@
-import { useState, useEffect, useRef } from "react";
-import { Play, Trophy, Target, Zap, Volume2, VolumeX, Flag, Music } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Play, Trophy, Target, Zap, Volume2, VolumeX, Flag, LogIn, User } from "lucide-react";
 import { useNavigate } from "react-router";
+import { useAuth } from "../contexts/AuthContext";
 import Leaderboard from "../components/Leaderboard";
 
 export default function StartScreen() {
   const navigate = useNavigate();
+  const { user, userProfile, loading } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [name, setName] = useState("");
-  const [savedName, setSavedName] = useState<string | null>(null);
+  
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [hoveredCard, setHoveredCard] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 100);
-
-    // Load existing name if stored
-    const existing = localStorage.getItem("playerName");
-    if (existing) {
-      setSavedName(existing);
-      setName(existing);
-    }
-
-    return () => {
-      clearTimeout(timer);
-    };
+    return () => clearTimeout(timer);
   }, []);
 
   const startGame = () => {
-    if (name.trim() === "") {
-      alert("Please enter your name first!");
-      return;
+    if (user) {
+      // User is already logged in, go directly to levels
+      navigate("/levels");
+    } else {
+      // User is not logged in, redirect to login page
+      navigate("/auth");
     }
-    localStorage.setItem("playerName", name.trim());
-    navigate("/levels");
   };
 
   return (
@@ -148,19 +140,21 @@ export default function StartScreen() {
             </div>
           </div>
 
-          {/* Username Input */}
-          <div className="bg-white/20 backdrop-blur-lg rounded-2xl p-8 shadow-2xl mb-8 max-w-lg mx-auto border border-white/30">
-            <label className="block text-white font-semibold mb-4 text-xl drop-shadow-lg">
-              Enter your name to begin:
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your golf pro name..."
-              className="w-full p-4 rounded-xl border-2 border-white/30 focus:outline-none focus:ring-4 focus:ring-emerald-400/50 focus:border-emerald-400 bg-white/90 backdrop-blur-sm text-gray-800 font-medium text-lg placeholder-gray-500 shadow-inner transition-all duration-300"
-            />
-          </div>
+
+          {/* Welcome message for authenticated users */}
+          {user && userProfile && (
+            <div className="bg-white/15 backdrop-blur-lg rounded-2xl p-6 shadow-2xl mb-6 max-w-md mx-auto border border-white/30">
+              <div className="flex items-center gap-3 justify-center">
+                <User className="w-5 h-5 text-white" />
+                <span className="text-white text-lg font-semibold">
+                  Welcome back, {userProfile.displayName}!
+                </span>
+              </div>
+              <p className="text-white/70 text-sm text-center mt-2">
+                Ready for another round?
+              </p>
+            </div>
+          )}
 
           {/* Play Button */}
           <div className="space-y-4">
@@ -172,8 +166,17 @@ export default function StartScreen() {
               {/* Button shine effect */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
               
-              <Play className="w-6 h-6 relative z-10" />
-              <span className="relative z-10">{savedName ? "Continue" : "Start Playing"}</span>
+              {user ? (
+                <>
+                  <Play className="w-6 h-6 relative z-10" />
+                  <span className="relative z-10">Continue Playing</span>
+                </>
+              ) : (
+                <>
+                  <LogIn className="w-6 h-6 relative z-10" />
+                  <span className="relative z-10">Sign In to Play</span>
+                </>
+              )}
             </button>
             
             {/* Instruction text */}
